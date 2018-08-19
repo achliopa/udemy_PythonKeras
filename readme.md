@@ -125,4 +125,222 @@ plt.title("Blue circles and Red crosses")
 
 ### Lecture 8 - Tabular Data
 
-* 
+* table format (rows-columns)
+* csv,tsv
+* dbs (tables)
+* a row is a record. 
+* in ML a feat is an individual measurable property of something being observed. propertes to characterize our data
+	* measured
+	* calculated (engineered with featured enginewering)
+* data can be continuous (measured) or discrete (categorical)
+* not all features are informative
+* a lot of emfasis is placed in feature engineering and feature selection
+
+### Lecture 9 - Data Exploration with Pandas CodeAlong
+
+* we usually start or ML process with data exploration
+	* get quick facts
+	* evident problems
+	* obvious usefull feats
+* In data exploration we answer the questions
+	* size of dataset?
+	* N features?
+	* missing data?
+	* data type?
+	* deistribution/correlation
+* pandas is THE way to data aexploration
+* it reads from virtually any source
+* we iport them , read the csv and see the dfs chars (head() info() describe())
+* in info() we see how many non-null vals we have (find missing data)
+* Pandas allows *indexing* of day in many ways
+	* by index location: `df.iloc[3]` we get a row (Series object)
+	* slicing indexes and select column by label: `df.loc[0:4,'Ticket']` we get multiple datapoint (indexed) (Series Object)
+	* by column label: `df['Ticket']` get back a column (Series object). with double brackets we get a Dataframe
+	* by multiple columns: `df[['Ticket','Embarked']]` get back multiple cols (Dataframe) .Only with double brackets
+	* to column selections i can get the .head() passing in how many rows
+* We can make conditional selection with pandas. the inside part returns a table of booleans that wehn passed in as datafram selection condition XORs only the tru cells. we get back a dataframe
+	* `df[df['Age'] > 70]` simple conditional returns filtered df (not applied to the original df)
+	* `df['Age'] > 70` returns bool ( we can count it)
+	* `df.query("Age > 70")` we can filter with string queries
+	* `df[(df['Age'] == 11) & (df['SibSp'] == 5)]` combined condtionals (complex) | and & used
+	* `df.query('(Age == 11) | (SibSp == 5)')` using a string query
+* with `.unique()` we get the unique vals in a column . usefull for categorical data to hot encode them or count them from classigfication (if labels)
+* we can sort data with df.sort_values() passing the order `df.sort_values('Age', ascending = False).head()`
+* we can get aggregates with specialized methods appliet o a column selection or a groupby method (chained)
+	* aggregate methods .value_vounts(), min(), max(), mean(), median(), std()
+	* simple example: `df['Age'].max()`
+	* group by then column seletion then aggregate `df.groupby(['Pclass', 'Survived'])['PassengerId'].count()`
+	* better save aggregation as a new val
+	```
+	std_age_by_survived = df.groupby('Survived')['Age'].std()
+	std_age_by_survived
+	```
+	* aggregation result is a Series object to convert it back to DataFrame we  use .reset_index() and store it to a new val
+* we can round up decimals with .round(decimals) passing in how many decimals we want
+* we can merge two dataframs specifying the column on which we will do the merge `df3 = pd.merge(df1, df2, on='Survived')`
+* we can pass new column labels to a dataframe `df3.columns = ['Survived', 'Average Age', 'Age Standard Deviation']`
+* we can resuffle a datafram with the powerful pivot method
+```
+df.pivot_table(index='Pclass',
+               columns='Survived',
+               values='PassengerId',
+               aggfunc='count')
+```
+* we can make new columns `df['IsFemale'] = df['Sex'] == 'female'` here a boolean column based on some condition
+* we can genrate the correlation value of a column withe the other columns in the dataframe and sort the values (default ascending order)
+```
+correlated_with_survived = df.corr()['Survived'].sort_values()
+correlated_with_survived
+```
+* 0 correlation is unrelated. positive or negative correlation is usefule
+* we can use panda plot to plot the correlations
+```
+correlated_with_survived.iloc[:-1].plot(kind='bar',
+                                        title='Titanic Passengers: correlation with survival')
+```
+
+### Lecture 10 - Visual Data Exploration
+
+* for continuous data => lineplot
+* find correlated data => scatter plot
+* distributions => histogram (we lose order info)
+* subtipe of histogram => cummulative distribution (s curve)
+* compare distributions => boxplot
+
+### Lecture 11 - Plotting with Matplotlib
+
+* we create 3 datasets as numpy arrays
+```
+data1 = np.random.normal(0, 0.1, 1000)
+data2 = np.random.normal(1, 0.4, 1000) + np.linspace(0, 1, 1000)
+data3 = 2 + np.random.random(1000) * np.linspace(1, 5, 1000)
+data4 = np.random.normal(3, 0.2, 1000) + 0.3 * np.sin(np.linspace(0, 20, 1000))
+```
+* we stack them vertically using transpose `data = np.vstack([data1, data2, data3, data4]).transpose()` to stack them as collumns (1000,4) ranther than (4,1000) if we didnt use transpose()
+* we convert it to dataframe `df = pd.DataFrame(data, columns=['data1', 'data2', 'data3', 'data4'])`
+* *LINEPLOT*
+	* in pandas (all columns): `df.plot(title='Line plot')`
+	* same line plot in matplotlib (more control):
+	```
+	plt.plot(df)
+	plt.title('Line plot')
+	plt.legend(['data1', 'data2', 'data3', 'data4'])
+	```
+* *SCATTERPLOT*
+	* in pandas (lineplot style): `df.plot(style='.')`
+	* in pandas (correlation of 2 columns):
+	```
+	df.plot(kind='scatter', x='data1', y='data2',
+            xlim=(-1.5, 1.5), ylim=(0, 3))
+	```
+* *HISTOGRAM*
+	* in pandas (all columns)
+	```
+	df.plot(kind='hist',
+        bins=50,
+        title='Histogram',
+        alpha=0.6)
+	```
+* *CUMMULATIVE DISTR - HISTOGRAM
+	* in pandas (s-curve) normalized:
+	```
+	df.plot(kind='hist',
+        bins=100,
+        title='Cumulative distributions',
+        normed=True,
+        cumulative=True,
+        alpha=0.4)
+    ```
+* *BOXPLOT* panda style
+	* in pandas(all columns): `df.plot(kind='box', title='Boxplot')`
+
+* *SUBPLOTS* panda style
+	* we first set the grid (cols,rows) as axes `fig, ax = plt.subplots(2, 2, figsize=(5, 5))`
+	* then we plot passing in the subplot index (position in table) `df.plot(ax=ax[0][0],
+        title='Line plot')`
+    * we use tight layout so that legends and all are in place `plt.tight_layout()`
+* *PIECHARTS*
+	* we use aggregates to generate categorical data from continuous and count them
+	```
+	gt01 = df['data1'] > 0.1
+	piecounts = gt01.value_counts()
+	piecounts
+	```
+	* we do the plot (piechart panda style)
+	```
+	piecounts.plot(kind='pie',
+               figsize=(5, 5),
+               explode=[0, 0.15],
+               labels=['<= 0.1', '> 0.1'],
+               autopct='%1.1f%%',
+               shadow=True,
+               startangle=90,
+               fontsize=16)
+	```
+* *HEXPLOT panda style*
+	* we generate data (almost identical continuous data)
+	```
+	data = np.vstack([np.random.normal((0, 0), 2, size=(1000, 2)),
+                  np.random.normal((9, 9), 3, size=(2000, 2))])
+	```
+	* we make them dataframe of 2 columns `df = pd.DataFrame(data, columns=['x', 'y'])`
+	* we make line plot `df.plot()`
+	* we make kde plot `df.plot(kind='kde')`
+	* we do the hexbin plot of one column to the other (correlation) `df.plot(kind='hexbin', x='x', y='y', bins=100, cmap='rainbow')`
+
+### Lecture 12 - Unstructured Data
+
+* images,sound,text
+* to convert unstructured data to features to be used in machine learning we fdo Feature Extraction usually with Deep Learning (NNs)
+* Image is a matrix of pixes (1 or 3 color values) so a 3d table HxWxC
+* usually we flatten out into a single array `(H,W,C) => (H*W*C,)`
+* when we flatten out we loose corellation of a pixel to its neighbours
+* what we care in feature extraction in image is not the pixel but the tegel or kernel (a small subset of image)
+* these are used in CNN
+* Sound is a long series of numbers. we can plot it out. x axis is time and y is the amplityde of the sound
+* if we flatten it out we can stack  sounds to a table but its problematic as the size differs (not all sounds have same duration)
+* sounds carry the information in frequencies . raw format (amplitude is not very useful)
+* NNs can encode sound directly
+* text we can extract features with words frequency(TFIDF), embeddings(WORD2VEC), parts of speech using NNs
+
+### Lecture 13 - Images and Sound in Jupyter
+
+* we use PILLOW library to import images
+* we import Image class from pillow `from PIL import Image`
+* we use the class to open an image file and get its contents `img = Image.open('../data/iss.jpg')`
+* if we call `img` we render the image its of type `PIL.JpegImagePlugin.JpegImageFile`
+* we transform the image to a numpy array using the .asarray() method `imgarray = np.asarray(img)`
+* the type of the converted image is a numpy ndarray and the shape `imgarray.shape` is ((435, 640, 3)) so HxWxC
+* we can flatten the image array into a single dimension flat array with .ravel() `imgarray.ravel()` its shape is 
+(835200,) equal to HxWxC
+
+* for Sound we use the  wavfile class from scipy.io
+* we import it `from scipy.io import wavfile`
+* we use it to read in a wav file `rate, snd = wavfile.read(filename='../data/sms.wav')`
+* we get back 2 objects
+	* snd of type an numpy.ndarray of shape (110250,) (sound length) containing the soundbits as int16
+	* rate of type int which is the bitrate 44100
+* we can play the sound in jupyter using the audio player. we impor it `from IPython.display import Audio` and we instantiate it passin in the sound obkects `Audio(data=snd, rate=rate)` we view a sound player
+* we can plot the snd object `plt.plot(snd)` what we get is the waveform
+* we can use matplotlib *scectrogram* plot passing in the NFFT param and the rate as Fs to see the sound spectrogram to see the sound frequency over time (COOL!!)
+
+### Lecture 14- Feature Engineering
+
+* feature engineering needs 
+	* expretise
+	* domain knowledge
+	* diffult and expensive process
+* if we train a ML model on face recognition we can extract feats by identifying key points on face and measuring distance between them. we go thus from a 2D image to an Ndistance vector
+* Deeo Learning Disrupted Feature Engineering as itself finds the best way to extract the features: More powerful and faster approach
+* Deep learning IS our Domain Expert
+* Traditional feature engineering takes time
+* deep learning is automated feature engineering
+
+## Lecture 15 - Exercises
+
+* easy way to split between two classes for box plotting `dfpvt = df.pivot(columns='Gender',values='Weight')`
+* scatter_matrix
+```
+from pandas.tools.plotting import scatter_matrix # now pandas.plotting
+_ = scatter_matrix(df.drop('PassengerId',axis=1),figsize=(10,10))
+```
