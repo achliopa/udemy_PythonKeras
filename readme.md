@@ -344,3 +344,27 @@ data4 = np.random.normal(3, 0.2, 1000) + 0.3 * np.sin(np.linspace(0, 20, 1000))
 from pandas.tools.plotting import scatter_matrix # now pandas.plotting
 _ = scatter_matrix(df.drop('PassengerId',axis=1),figsize=(10,10))
 ```
+
+### Section 3 - Machine Learning
+
+### Lecture 25 - Machine Learning problems
+
+* supervised learning, unsupervised learning, reinforced learning
+* deeplearnign is applied to all
+
+### Lecture 26 - Supervised Learning
+
+* SL helped us get rid of spam emails
+* our sorting of emails to spam fed the supervised learning algos
+* Binary Classification
+	* churn prediction
+	* sentiment analysis (on celebrity posts based on responses)
+	* click prediction
+	* disease screening
+	* human detection (humanor bot on captchas)
+* Multi class classification
+* Regression (continuous)
+
+### Lecture 27 - Linear Regression
+
+* 
