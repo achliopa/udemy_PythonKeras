@@ -367,4 +367,165 @@ _ = scatter_matrix(df.drop('PassengerId',axis=1),figsize=(10,10))
 
 ### Lecture 27 - Linear Regression
 
-* 
+* in linear regresion we seek a pattern a correlation between some feats an a continouous label we want to predict.
+* the pattern is a linean that matches the correlation
+* in linear regression we use a linear function to deduct the target val form a feature (or features)
+* in multi feature datasets instead of line we have a multidimensional linear plane
+* in 2d the linear regression is a ycalc=wX+b 
+* w -> slpe , b -> offset
+
+### Lecture 28 - Cost Function
+
+* to choose the best model we should measure how googd it is
+* in supervised learning we know the targets ytrue
+* the residual is the offset ytrue-ycalc. it is signed
+* the total error is  Σ|ei| = Σ|ytruei-ycalci| this si a cost function.
+* usually we use MSE (mean square error) or RMSE
+* MSE penalizes large differences (squares)
+* MSE is smooth and with global minimum
+
+### Lecture 29 - Cost Function Code Along
+
+* we ll see how to load data, plot them and calculate the cost function
+* we import matplotlib, pandas and numpy
+* we import data.
+* we scatter plot height vs weight and manually draw a line  of our linear fit
+```
+df.plot(kind='scatter',
+        x='Height',
+        y='Weight',
+        title='Weight and Height in adults')
+
+# Here we're plotting the red line 'by hand' with fixed values
+# We'll try to learn this line with an algorithm below
+plt.plot([55, 78], [75, 250], color='red', linewidth=3)
+```
+* we define a llinear function y
+```
+def line(x, w=0, b=0):
+    return x * w + b
+```
+we set input linspace `x = np.linspace(55, 80, 100)` set w and b to 0 `yhat = line(x, w=0, b=0)` and redo the plot this time plotting th eline as yhat. (its parallel to x axiz and 0)
+* we calcualte MSE in a function
+* we use it to ge the error (we use flattening to y_pred)
+```
+def mean_squared_error(y_true, y_pred):
+    s = (y_true - y_pred)**2
+    return s.mean()
+X = df[['Height']].values
+y_true = df['Weight'].values
+y_pred = line(X)
+mean_squared_error(y_true, y_pred.ravel())
+```
+* with df['column'].values we get a numpy array froma pandas series object
+
+### Lecture 30 - Finding The best Parameter
+
+* choose b and w (small amount) so that MSE decreases... then it goes to a minimum and starts increasing again
+* its a param - cost plot that U shaped. param is not an axis but a plane... its a 3 3 Cup (concave) shaped plot. in its bottom are the b,w vals that give miniimum cost
+* Finding the best combination is called TRAINING
+* training => minimize cost
+* minumum cost => best model
+
+### Lecture 31 - Linear Regresion COde Along
+* we plot a scatterplot of weight vs heignt
+```
+ax1 = plt.subplot(121)
+df.plot(kind='scatter',
+        x='Height',
+        y='Weight',
+        title='Weight and Height in adults', ax=ax1)
+```
+* we make an array of biases
+```
+bbs = np.array([-100, -50, 0, 50, 100, 150])
+```
+* we set w constant =2 and calcculate MSE and plot the linear fit for each w,b combo
+```
+for b in bbs:
+    y_pred = line(X, w=2, b=b)
+    mse = mean_squared_error(y_true, y_pred)
+    mses.append(mse)
+    plt.plot(X, y_pred)
+```
+* we plot the sost vs b curve
+```
+# second plot: Cost function
+ax2 = plt.subplot(122)
+plt.plot(bbs, mses, 'o-')
+plt.title('Cost as a function of b')
+plt.xlabel('b')
+```
+* we see the minimum between 0 and 50
+* we ll go Linear Regression with Keras
+* we import the type of model we want to implement (Sequential) `from keras.models import Sequential`
+* we import the type of layers we want to use (Dense) `from keras.layers import Dense`
+* we import our optimizers `from keras.optimizers import Adam, SGD`
+* we create a model instance `model = Sequential()`
+* we add a layer to our model `model.add(Dense(1, input_shape=(1,)))` we use 1 neuron (1 output) and our input is a 1d array of size 1
+* we print out the model summary `model.summary()`
+* the output print is
+```
+_________________________________________________________________
+Layer (type)                 Output Shape              Param #   
+=================================================================
+dense_1 (Dense)              (None, 1)                 2         
+=================================================================
+Total params: 2
+Trainable params: 2
+Non-trainable params: 0
+```
+* we have 2 params (w,b) 1 output shaped (None,1) none is reserved for batches
+* in keras we need to compile the model `model.compile(Adam(lr=0.8), 'mean_squared_error')` or else constuct the model using the backend (in our case tensorflow)
+* for the same model we can use various bakcends
+* in compile we define the cost function we want to use
+* next we train our model  passing input and output placeholders and the num of epochs `model.fit(X, y_true, epochs=40)`
+* loss is dropping
+* we can now use our model to do predictions `y_pred = model.predict(X)`
+* we now plot our data set (X,y_true) points and the y_pred as a line (linear fit)
+```
+df.plot(kind='scatter',
+        x='Height',
+        y='Weight',
+        title='Weight and Height in adults')
+plt.plot(X, y_pred, color='red')
+```
+* we print out W,b using  model.get_weights() method `W, B = model.get_weights()`
+
+### Lecture 32 - Evaluating performance
+
+* we ll learn how to define a baseline model, ho to use score to compare models, hot to  do train/test split
+* in ou previous model we minimzed cost but we worked only with our dataset. we dont know how our model will perform in anoher dataset or with data
+* we need a simple model to use as areference
+* we need a score to compare different models. (the cost cannot do the job as it is dependent on value scale)
+* a common score for regression models is R2. the R2 compares the sum of the squares of residuals in our model with the sum of the squares of a baseline model that predicts the average price all the time R^2 = 1 -(SSres/SStot)
+* In a ggod model the R^2 is close to 1
+* R^2 can have negative val if our  model is less than average
+* to check if our model generalizes well we need t split our data to training and test set
+
+### Lecture 33 - Evaluate Performance Code Along
+
+* we import train test split `from sklearn.model_selection import train_test_split`
+* we split the data `X_train, X_test, y_train, y_test = train_test_split(X, y_true, test_size=0.2)`
+* we reset the weights of our model 
+```
+W[0, 0] = 0.0
+B[0] = 0.0
+model.set_weights((W, B))
+```
+* we detrain the model by choosing to reset W and B to retrain it using the train set `model.fit(X_train, y_train, epochs=50, verbose=0)`
+* we use the x_train data to make our predictions `y_train_pred = model.predict(X_train).ravel()` note we flatten in the input data (weird as we trained on it)
+* we do the same for test data `y_test_pred = model.predict(X_test).ravel()`
+* we import mse from sklearn
+* we calculate and print it out 
+```
+print("The Mean Squared Error on the Train set is:\t{:0.1f}".format(mse(y_train, y_train_pred)))
+print("The Mean Squared Error on the Test set is:\t{:0.1f}".format(mse(y_test, y_test_pred)))
+```
+* we see that MSE is similar between test and train which is great
+* we calculate R2
+```
+print("The R2 score on the Train set is:\t{:0.3f}".format(r2_score(y_train, y_train_pred)))
+print("The R2 score on the Test set is:\t{:0.3f}".format(r2_score(y_test, y_test_pred)))
+```
+* R@ is good and similar
