@@ -528,4 +528,231 @@ print("The Mean Squared Error on the Test set is:\t{:0.1f}".format(mse(y_test, y
 print("The R2 score on the Train set is:\t{:0.3f}".format(r2_score(y_train, y_train_pred)))
 print("The R2 score on the Test set is:\t{:0.3f}".format(r2_score(y_test, y_test_pred)))
 ```
-* R@ is good and similar
+* R2 is good and similar
+
+###  Lecture 34 - Classification
+
+* example problem. if customer will buy or not based on time spent on site
+* classification is supervised learning on discrete targets (categorical  data)
+* logistic regression is a typical classification model
+* if we scaterplot linear vs cat3egorigal data is not uuseful
+* the logistic regression regression predicts modeling the probability of the outcome using the logistic curve
+* ith ehypotheses uses the sigmoid function ypred = sigm(b+Xw)
+* the cost function cannot be the MSE. for claasification we use log loss or cross entropy cost
+* the classification cost is calculated from ci = -(1-yi)log(1-ypredi)-yilog(ypredi) y and yrped can be 0 or 1
+* ci = -log(1-ypredi) when yi =0 or -log(ypredi) when yi = 1 
+* when y = 1 we expect ypredi to be 1 (in sigmoid this is when x is large and possitive) so we make cost small
+* if x is negative we make cost larger and larger. 
+* when y is 0 we expect ypred to be 0 and x is pushed to negative val
+* we have the cost for an individual point i
+* the general cost is c = (1/N)Σici (average cross entropy) or binary log loss
+* to select the best params that minimize thhe cost. logistic regression calculates probability. we need to convert it to a binary predictions. the simplest way is to set a threshold e.g P > 0.5 => ypred = 1 otherwise y = 0
+* a metric for evaluating our classification model is accuracy (number of correct predictions / total predictions)
+* usually we compare accuracy in training set with that on test set to see how well our model generalizes
+
+### LEcture 35 - Classification Code Along
+
+* we load our dataset from csv
+* we inspect it. just 2 columns one is target (labels) 1 feat time on site (cont)
+* we do a scatterplot `df.plot(kind='scatter', x='Time (min)', y='Buy')`
+* we instantiate our KERAS model (sequential) and add 1 dense layer of 1 neuron (1 output), 1 input and set activation method as sigmoid (in linear regression we did not set an activation merthod)
+```
+model = Sequential()
+model.add(Dense(1, input_shape=(1,), activation='sigmoid'))
+```
+* we compile our keras model passing  in params (binary cross entropy as cost method, SGD 'gradient descent' as optimizer, accuracy as metric) `model.compile(SGD(lr=0.5), 'binary_crossentropy', metrics=['accuracy'])`
+* we print out the summary
+* we set our input and output arrays (from pandads to numpy) and train our model with them (no split) setting 25 epochs
+```
+X = df[['Time (min)']].values
+y = df['Buy'].values
+
+model.fit(X, y, epochs=25)
+```
+* our accuracy is not very good (not many data)
+* we plot our data as scatterplot and plot the sigmoid passing in linspaced data nd using `model.predict(temp)` to cslculste the y val (probability)
+```
+ax = df.plot(kind='scatter', x='Time (min)', y='Buy',
+             title='Purchase behavior VS time spent on site')
+
+temp = np.linspace(0, 4)
+ax.plot(temp, model.predict(temp), color='orange')
+plt.legend(['model', 'data'])
+```
+* we use a threshold to go from probabilities to  binary data (binary array) `temp_class = model.predict(temp) > 0.5`
+we plot the thresholded data as matplotlib treats booleans as 0 or 1 
+```
+temp = np.linspace(0, 4)
+ax.plot(temp, temp_class, color='orange')
+plt.legend(['model', 'data'])
+```
+* we get the model accuracy by getting the predictions and converting it to binsry using teh threshold
+```
+y_pred = model.predict(X)
+y_class_pred = y_pred > 0.5
+```
+* we import the metric and print it out passing the label (classes) of the y_true and the predictions in binary format `print("The accuracy score is {:0.3f}".format(accuracy_score(y, y_class_pred)))`
+* we ll now do the train test split train on train data and evaluate both with train and test 
+* we split our dataset 
+```
+params = model.get_weights()
+params = [np.zeros(w.shape) for w in params]
+model.set_weights(params)
+```
+* we get the model weights and zero them out
+```
+params = model.get_weights()
+params = [np.zeros(w.shape) for w in params]
+model.set_weights(params)
+```
+* we print out the accuracy `print("The accuracy score is {:0.3f}".format(accuracy_score(y, model.predict(X) > 0.5)))` it is 0.5 which is expected for an untrained model
+* we train the model with train data `model.fit(X_train, y_train, epochs=25, verbose=0)`
+* we print out accuracy both for train and test set
+```
+print("The train accuracy score is {:0.3f}".format(accuracy_score(y_train, model.predict(X_train) > 0.5)))
+print("The test accuracy score is {:0.3f}".format(accuracy_score(y_test, model.predict(X_test) > 0.5)))
+```
+
+### Lecture 36 - Overfitting
+
+* sigmoid function is non linear
+* weigths w is a size M vector
+* inputs X is a NxM matrix (N: num of records, M num of feats)
+* overfitting happens when the model learns the probability distribution of the training set too well so cannot generalize to test set equally well
+* If Train score >> Test score: Overfitting
+* How to avoid:
+	* split well. preserve labels ration
+	* randomly sample dataset
+	* test set not small
+	* train set not small
+	* reduce complexity of NN or do regularization
+
+### Lecture 37 - Cross Validation
+
+* do various train/test splits evaluate them and average scores
+* K-form cross validation:
+	* the dataset is split in K equally sized - random sampled subsets
+	* we do K rounds of train-test. in each one one subset is used as test set and the rest as train sets
+	* Accuragy = Average(Round Accuracy)
+	* Train More - get better estimation
+	* totally parallel problem (we can harness GPUs)
+* Stratified Kfold is similar to kfold but it makes sure the ratios of labels are preserved in the folds
+* LOLO & LPLO (leave one label out or leave p lables out). it si used if we have second label that is not target but might affect our accuracy. we leave one out or multiple out for testing to simulate a new unknown set of data (use groupby)
+
+### Lecture 38 - Cross Validation Code Along
+
+* we import a wrapper to use keras models in scikit learn `from keras.wrappers.scikit_learn import KerasClassifier` as cross validation function is in sccikit learn
+* we implement a helper function that does the whole keras model building sequence
+```
+def build_logistic_regression_model():
+    model = Sequential()
+    model.add(Dense(1, input_shape=(1,), activation='sigmoid'))
+    model.compile(SGD(lr=0.5),
+                  'binary_crossentropy',
+                  metrics=['accuracy'])
+    return model
+```
+* we do this because the KerasClassifier needs our model as a function return
+```
+model = KerasClassifier(build_fn=build_logistic_regression_model,
+                        epochs=25,
+                        verbose=0)
+```
+* having our model in scikit learn allows us to use its tools on it. we import cross validation and KFold `from sklearn.model_selection import cross_val_score, KFold`
+* we make an cross validation instance doing 3 folds `cv = KFold(3, shuffle=True)`
+* to get the scores we use crossvalscore passing the model and the cross val method `scores = cross_val_score(model, X, y, cv=cv)`
+* we print out our scores from 3 folds `scores`
+* and calculate tyhe mean and std `scores.mean(), scores.std()`
+
+### Lecture 39 - Confusion Matrix
+
+* accuracy to judge our classsification model gives an indication about how we perform overall
+* the confusion matrix gives more insight TP,TN,FP (Type I error),FN (Type II Error)
+* Accuraty (TP+TN)/total
+* Precision TP/ (TP+FP)
+* Recall TP/(TP+FN)
+* FI = 2PR(P+R)
+* these metrics scale for categorical data in more classes
+
+### Lecture 40 - Confusion matrix Code Along
+
+* we import it from scikit `from sklearn.metrics import confusion_matrix` and print it out `confusion_matrix(y, y_class_pred)`
+* we can print it out as panda dataframe (prettyfy)
+```
+def pretty_confusion_matrix(y_true, y_pred, labels=["False", "True"]):
+    cm = confusion_matrix(y_true, y_pred)
+    pred_labels = ['Predicted '+ l for l in labels]
+    df = pd.DataFrame(cm, index=labels, columns=pred_labels)
+    return df
+pretty_confusion_matrix(y, y_class_pred, ['Not Buy', 'Buy'])
+```
+* we import rest of classification metrics
+```
+from sklearn.metrics import precision_score, recall_score, f1_score
+```
+* we print them out
+```
+print("Precision:\t{:0.3f}".format(precision_score(y, y_class_pred)))
+print("Recall:  \t{:0.3f}".format(recall_score(y, y_class_pred)))
+print("F1 Score:\t{:0.3f}".format(f1_score(y, y_class_pred)))
+```
+* easiest way to print the classification report `from sklearn.metrics import classification_report`
+```
+print(classification_report(y, y_class_pred))
+```
+
+### Lecture 41 - Feature Preprocessing Code Along
+
+* we ll use onehot encoding for categorical classes 
+* we read out data `df = pd.read_csv('../data/weight-height.csv')` and view it with .head()
+* we check unique vals in gender `df['Gender'].unique()`
+* we make dummy cols (one hot encoding) these are mututally exclusive `pd.get_dummies(df['Gender'], prefix='Gender').head()` we get a new col per unique val
+* ANNs work best with feats scaled to 0-1 vals (due to activation fucntions used) so we rescale
+* we can rescale manually
+```
+df['Height (feet)'] = df['Height']/12.0
+df['Weight (100 lbs)'] = df['Weight']/100.0
+```
+* we get tranges comparable to 1 but not 1 `df.describe().round(2)`
+* to scale in 0-1 range we use MinMaxScaler `from sklearn.preprocessing import MinMaxScaler`
+* we instantiate it and call fit_transform
+```
+ss = StandardScaler()
+df['Weight_ss'] = ss.fit_transform(df[['Weight']])
+df['Height_ss'] = ss.fit_transform(df[['Height']])
+df.describe().round(2)
+```
+* we can isntead do standard normalization (mean of data is 0 and std deviation is 1) hoowever outliners will be out of 0-1 range
+```
+from sklearn.preprocessing import StandardScaler
+
+ss = StandardScaler()
+df['Weight_ss'] = ss.fit_transform(df[['Weight']])
+df['Height_ss'] = ss.fit_transform(df[['Height']])
+df.describe().round(2)
+```
+* we plot the histogram of the 2 normalization resutls
+```
+plt.figure(figsize=(15, 5))
+
+for i, feature in enumerate(['Height', 'Height (feet)', 'Height_mms', 'Height_ss']):
+    plt.subplot(1, 4, i+1)
+    df[feature].plot(kind='hist', title=feature)
+    plt.xlabel(feature)
+```
+* plots are same but only ranges vary
+
+### Lecture 42 - Exercise 1 
+
+* need to convert dataframes to numpy.ndarrays prior to KEras insertion (use .values)
+
+### Lecture 44 - Exercise 2 
+
+* benchmark is the easiest model we can build `df.left.value_counts()/len(df)` 0 is 76% so predicting everybody stayes will give 76% accuracy
+* multiple column dummies `df_dummies = pd.get_dummies(df[['sales','salary']])`
+
+## Section 4 
+
+### Lecture 46 - Deep Learning Successes
+
+* 
