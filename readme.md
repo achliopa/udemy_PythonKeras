@@ -755,4 +755,219 @@ for i, feature in enumerate(['Height', 'Height (feet)', 'Height_mms', 'Height_ss
 
 ### Lecture 46 - Deep Learning Successes
 
-* 
+* difference betweeen deep learning and traditional machine learning
+	* deep learning models get better (better performance) as we throw more training data inthem , ML improves and plateaus
+	* Easier pipeline: DL => Input -> DL -> Output, ML => Input -> Feature Extraction -> Feats -> Shallow ML algo -> Output
+
+### Lecture 47 - Neural Networks
+
+* Neuron: Multiple Inputs -> One Output (One activation function)
+* Linear regression as NN: b-> , x(W)-> [xW+B] -> y=xW+B (neuron does one mul and one add)
+	* if we have multiple inputs and weights x and W are vectors so the multiplication is . (dot) the notation is the same.. y = xdotW+b
+* to go from linear regression to logistic we just apply a sigmoid  activation function notation is same but after neuron -> sigmoid -> y = sigmoid(xdotW+b)
+* the first Neural network invented (Perceptron) is exactly the same but with a different activation function y = H(xdotW+b) H is a step function (0 if input < 0 1 if input > 0) it has a discontinuity at 0 so bias is not 0
+
+### Lecture 48 - Deeper networks
+
+* Deep networks have hidden layes . multiple neurons per layer and multiple layers
+* we build deep nns by stacking perceptront one to the other
+* say we have vector input of size N and a layer of N neurons, 1 per vector element.mathematically is represented Z1 = XdotW1+B1 = Σj(xijW1jk)+bj for every node k. this is layer 1
+* activation is appied afte input is weighted and biased O1 = actf(Z1)
+* second layer does the same O2 = actf(O1dotW2+B2)
+* this is a fully connected multilayer network
+
+### Lecture 49 - Neural network Code along
+
+* we import the libraries
+```
+%matplotlib inline
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+```
+* we import from sklearn moon shape data generator
+```
+from sklearn.datasets import make_moons
+
+X, y = make_moons(n_samples=1000, noise=0.1, random_state=0)
+plt.plot(X[y==0, 0], X[y==0, 1], 'ob', alpha=0.5)
+plt.plot(X[y==1, 0], X[y==1, 1], 'xr', alpha=0.5)
+plt.legend(['0', '1'])
+```
+* the data are 2 classes of interleaping moons . the separation line should be a curve not a line
+* we do the train test split
+```
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+```
+* we import keras libs
+```
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.optimizers import SGD, Adam
+```
+* we implement a shallow model of logistic regression with 1 layer
+```
+model = Sequential()
+model.add(Dense(1, input_shape=(2,), activation='sigmoid'))
+model.compile(Adam(lr=0.05), 'binary_crossentropy', metrics=['accuracy'])
+```
+* we train it with train data for 200 epochs `model.fit(X_train, y_train, epochs=200, verbose=0)`
+* we get the results `results = model.evaluate(X_test, y_test)` and print them out. second element that is accuracy. the accuracy is 0.85
+* we printout the decision boundary. it is a straight line
+```
+def plot_decision_boundary(model, X, y):
+    amin, bmin = X.min(axis=0) - 0.1
+    amax, bmax = X.max(axis=0) + 0.1
+    hticks = np.linspace(amin, amax, 101)
+    vticks = np.linspace(bmin, bmax, 101)
+    
+    aa, bb = np.meshgrid(hticks, vticks)
+    ab = np.c_[aa.ravel(), bb.ravel()]
+    
+    c = model.predict(ab)
+    cc = c.reshape(aa.shape)
+
+    plt.figure(figsize=(12, 8))
+    plt.contourf(aa, bb, cc, cmap='bwr', alpha=0.2)
+    plt.plot(X[y==0, 0], X[y==0, 1], 'ob', alpha=0.5)
+    plt.plot(X[y==1, 0], X[y==1, 1], 'xr', alpha=0.5)
+    plt.legend(['0', '1'])
+    
+plot_decision_boundary(model, X, y)
+```
+* we build a dense model of 3 layers (4 neurons in first, 2 in second 1 in last)
+```
+model = Sequential()
+model.add(Dense(4, input_shape=(2,), activation='tanh'))
+model.add(Dense(2, activation='tanh'))
+model.add(Dense(1, activation='sigmoid'))
+model.compile(Adam(lr=0.05), 'binary_crossentropy', metrics=['accuracy'])
+```
+* we train it `model.fit(X_train, y_train, epochs=100, verbose=0)`
+* we get the results `model.evaluate(X_test, y_test)` accuracy is 1 (excelent)
+* we get accuracy for train and test data
+```
+y_train_pred = model.predict_classes(X_train)
+y_test_pred = model.predict_classes(X_test)
+
+print("The Accuracy score on the Train set is:\t{:0.3f}".format(accuracy_score(y_train, y_train_pred)))
+print("The Accuracy score on the Test set is:\t{:0.3f}".format(accuracy_score(y_test, y_test_pred)))
+```
+* and plot the boundary. it is a nicely fitted curve
+
+### Lecture 50 - Multiple Outputs
+
+* we will learn to extend our network for multiple outputs
+* this applies to multiclass classification problems (A<B<C)
+* or regression problems where the output is a vector of values (self driving cars=> predict direction and speed of car)
+* we add as many output nodes as the elements in the vector or the classes in our multiclass classification problem
+* each node will generate an independent value that gets assigned to a componenbt of the vector
+* in classification we can have mutually exclusive classes (A,b or C) or non exclusive classes (e.g tags)
+* in both cases we generate binary dummy columns (in mutually exclusive we can have only one 1, in non exclusive we can have more 1s)
+* for independent tags each one needs to be noprmalized to 0 -1. we use a sigmoid activation function on each output node as probabilities are independent
+* for mutually exclusive classes. we need an activation function that forces the sum of the outputs to be 1. we use SOFTMAX. σ(z)j = exp(zj)/Σk=1toK(exp(zk)) for j=1,..,K
+* vector regression => many output nodes
+* multi class classification => softmax output
+* non exclusive tags => many sigmoid output nodes
+
+### Lecture 51 - Multiclass Classification Code Along
+
+* we load the iris dataset `df = pd.read_csv('../data/iris.csv')`
+* we do a seaborn pairplot of the numeric columns to see correlations with hue on tager class
+```
+import seaborn as sns
+sns.pairplot(df, hue="species")
+```
+* we have 4 feats and 3 outputs (mutually exclusize aka softmax)
+* we make X matrix (dataframe) excluding target `X = df.drop('species', axis=1)`
+* we ptrint out different classes `target_names = df['species'].unique()`
+* we create a dict fromn classes to assign numeric vals `target_dict = {n:i for i, n in enumerate(target_names)}`
+* we make our target array using as map the dictionary of classes `y= df['species'].map(target_dict)`
+* we use keras utility to make dummy hotencoded columsn for targets from our target array
+```
+from keras.utils.np_utils import to_categorical
+y_cat = to_categorical(y)
+```
+* we do the train test split. `X_train, X_test, y_train, y_test = train_test_split(X.values, y_cat,
+                                                    test_size=0.2)`
+* we implement our model (1 layer, 3 nodes aka outputs, 4 input vector, softmax) we use categrorical crossentropy not binary
+```
+model = Sequential()
+model.add(Dense(3, input_shape=(4,), activation='softmax'))
+model.compile(Adam(lr=0.1),
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+```
+* we train our model `model.fit(X_train, y_train, epochs=20, validation_split=0.1)` we use validation split taking 10% of training data for validatioon to check loss
+* we get our predictions `y_pred = model.predict(X_test)`
+* each prediction has 3 numbers (the probability of each class) we keep the one with maximum probability
+```
+y_test_class = np.argmax(y_test, axis=1)
+y_pred_class = np.argmax(y_pred, axis=1)
+```
+* we print out metrics (classification reprot and confusion matrix)
+
+### Lecture 52 - Activation Functions
+
+* Sigmoid in python (binary classification)
+```
+def sigmoid(x):
+	return 1.0 / (1.0 + np.exp(-x))
+```
+* sigmoid smooths all real axis to a val between 0 to 1
+* Step function in python (original perceptron)
+```
+def step(x):
+	return x > 0
+```
+* it has a discontinuous transition in 0 
+* Hyperbolic Tangient (Tanh) in python
+```
+np.tanh(x)
+```
+* like sigmoid but goes from -1 to 1 penalizes negative values of x
+* Rectified Linear Unit (RELU) in python
+```
+def relu(x):
+	return x * (X > 0) # y=max(0,x)
+```
+* originates in biology. more effective than tanh  or sigmoid in NNs. it imroves training speed
+* SOFTPLUS in puthon
+```
+def softplus(x):
+	return np.log1p(np.exp(x)) #y=log(1+exp(x))
+```
+* is a smooth aproximation of RELU (smooth trransition in 0)
+* any activation function makes the NN non-linear
+* The secret power of NNs is the non-linearity between each layer allows them to deal with very complex data
+
+### Lecture 53 - Feed Forward
+
+* we can think of a NN as a black box that takes an imnput and applies a calculation F: y=F(x)
+* this calculation is called feed-forward ( amix of linear and non-linear steps)
+* input is a matrix PxN (P: num of rows => num of points, N: num of columns => num of features)
+* inputs are passed to nodes by beeing multiplied by weights. Weights in first layer W1: (NxM matrix) (N: num of rows => num of features, M: num of columns => num of nodes in layer 1)
+* Biases in first layer are a vector size M (M: num of nodes in layer 1)
+* 1st layer performs the linear transformation O1 = XdotW1+B1 that is followed by the non-linear transformation by the activation function Z1 = sigmoid(O1). Z1 is the output of layer 1 and is a matrix (PxM)
+* for layer 2 the procedure repeats. this time the input is PxM (Layer 1 output Z1) and the M for this layer is equal to the layer 2 nodes. same goes for other layers to
+* this is why we can think of the whole network as a single function F
+* last layer will have as many nodes as the values we try to predict
+
+### Lecture 54 - Exercise 1
+
+* if we do `_ = df.hist(figsize-(12,10))`
+* classes overlap
+* we can use seaborn heatmap to see correlations `sns.heatmap(df.corr(), annot=True)`
+* we do `df.describe()` to decide on normalization of feat data. each feat has its own scale.. he uses StandardScaler and from keras the to categorical util (for hot encoding)
+```
+from sklearn.preprocessing import StandardScaler
+from keras.utils import to_categorical
+```
+* we perform normalization and ho encoding (we should fir only on train data and do not hotencode)
+```
+sc = StandardScaler()
+X = sc.fit_transform(df.drop('Outcome',axis=1))
+y = df['Outcome'].values
+y_cat = to_categorical(y)
+```
