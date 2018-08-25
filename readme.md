@@ -971,3 +971,241 @@ X = sc.fit_transform(df.drop('Outcome',axis=1))
 y = df['Outcome'].values
 y_cat = to_categorical(y)
 ```
+
+## Section 5
+
+### Lecture 62 - Derivatives and Gradient
+
+* derivative is the rate of change of a param dx(t)/dt
+* derivative is the slope of the curve rf/dt(ti) = (f(ti) - f(ti-1))/(ti - ti-1)
+* partial derivatives multivariant function elevation = f(long,lat) or y = f(x1,x2) patial derivatives δf/δx1 δf/δx1
+* if we are in the top of a hill the fastest way down will be in the direction the hill is more steep
+* in a 2d plane of x1 and x2 the direction of the more abrupt change will be a 3d vector whose components are the partial derivatives with respect to each variable. we call this vector gradient (inverted triangle) called del
+* del f = [[δf/δx1],[δf/δx2]]
+* a gradient is an operation that takes a function of multiple variables and returns a vector. the components of this vector are all the partial derivatives of the function. partial derivs are functrions of all variables the gradient to is also a function of all variables (a vector function)
+* as we said the gradient gives the vector of maximum steepnes to the plane of x1,x2. if we want to go downhill we tkae the negative gradient. we will use it to minimize cost function
+
+### Lecture 63 - Backpropagation Intuition
+
+* say we have a function of 1 variable w, the function output is on the vertical axis
+* we now the function only arount pointw. we wnat to increase the output. we have to use functions slopw (derivative) to decide: w- δf/δw
+* the way of looking for the minimum of the function using derivatives (in case of multiple vars the gradient) is called gradient descent
+* we use the gradient descent to miniomize cost: w -> w-δcost/δw (we use this rule to update the param)
+
+### Lecture 64 - Chain Rule
+
+* we do gradient descent for a simple NN. one imput/one output , 2 layers of 1 node, sigmoid activation
+* output of layer 1 : z1 = xw1+b1 => a1=σ(z1)
+* output of layer 2 : z2 = a1w2+b2 => y^ = a2 = σ(z2)
+* the cost function can be abstracted as J=J(y,y^(w,b,x)) the predicted output y^ is a function of all inputs and weights and biases
+* if we calculate the partial derivative of the cost function to the layer 2 weight: δJ/δw2=δJ(y,s(z2(w2)))/δw2 where z2=a1w2+b2, y^=a2=σ(z2)
+* what we did is to calculate the derivative of a nested function using the CHAIN RULE
+* an example of the chain rule: h(x)=log(2+cos(x))
+	* f(g)=log(g)
+	* g(x)=2+cos(x)
+	* h(x)=f(g(x))
+	* CHAIN RULE: dh/dx = (df/dg)(dg/dx) : dlog(g)/dg = 1/g , d(2+cos(x))/dx= -sin(x) => d(log(2+cos(x)))/dx = -sin(x)/(2+cos(x))
+
+### Lecture 65 - Derivative Calculation
+
+* we ll calculate weight correction for a simple network and undertand why its called back propagation
+* we use the previous lecture simple network and its abstract methods. we want to calculate the derivative of the cost in respect to weight of layer 2 (partial derivative. 
+* as we saw before it is  δJ/δw2=δJ(y,σ(z2(w2)))/δw2 ιf we consider the layer methods (where z2=a1w2+b2, y^=a2=σ(z2)) and the chain rule it becomes (δJ/δa2)(δa2/δz2)(δz2/δw2)
+	* the first term (δJ/δa2) depends on the form of the cost (δJ/δυ^) it can be calculated from the MSE, Log loss etc
+	* the second term δa2/δz2 is the derivative of the activation function a2 = σ(z2) => δσ(z2)/δz2=σ(z2)σ(1-z2) using the derivative of the sigmoid
+	* the third term δz2/δw2 is a derivative of alinear function z2 = a1w2+b2 so is δz2/δw2=a1
+* so the δJ/δw2=δJ/δy^σ(z2)σ(1-z2)a1 this is the value we will subtract from w2 to make the rule of gradient descent w2-δJ/δw2 to update the param to minimize cost function. if we represent αλλ the layer2 contributiont δJ/δy^σ(z2)σ(1-z2)=δ2 we see that it becomes δ2a1 so is propoirtional to th layer2 input by a factor δ2
+* δ2 is calculated taking into account parts of the network that are downstream to the output in respect to w2 and equals δ2=δJ/δz2 (remember chain rule)
+* We can use the same approach (chain rule) to calculate the correction to the weight in the first layer w1 δJ/dw1=(δJ/δa2)(δa2/δz2)(δz2/δa1)(δa1/δz1)(δz1/δw1)=δ1x
+* δ1 is proportional to δ2 : δ1=δ2w2σ(z1)σ(1-z1) thats why the method is called back propagation as we start from output and move to input calculating the correction to the weights to minimize the cost using the gradient descent
+
+### Lecture 66 - Fully Connected Backpropagation
+
+* we calculated the backpropagation for a simple network of only 2 nodes in series
+* we ll try now to expnad to a Fully Connected network
+* a fully connected network contains multiple nodes in each layer and each layer is connected to all nodes in teh previous and next layer
+* weights in each node are identified by two indices kj (k: receiving node, j: emmiting node)
+* the input sum at layer l and node k is zk@l = Σj(wkj@l)(aj@l-1)+b ktol so th input to activation function  is the weighted sum of all activations at layer l-1  + the bias terms at layer l
+* like before we can expand the derivative of cost function respective to the weight wkj in layer l using the chain rule δJ/δwkj@l=(δJ/δak@l)(δak@l/δzk@l)(δzk@l/δwk@l) the last 2 terms (δak@l/δzk@l)(δzk@l/δwk@l)=σ'(zk@l)aj@l-1 so the derivative of the sigmoid and the activation of the previous layer. the differentiating factor is the derivative of the cost (δJ/δak@l)=Σm((δJ/δzm@l+1)(δzm@l+1/δak@l))=Σm(δm@l+1wmk@l+1)
+* we see that deltas are connected by a recursive formula δk@l=(Σmδm@l+1wmk@l+1)σ'(zk@l) so we can u[date the deltas at layer l as a function of deltas at layer l+1]
+* that is why the method is called backpropagation we calculate deltas at output and from them we calculate deltas at previous layers
+
+### Lecture 67 - Matrix notation
+
+* we will calculate backpropagation using matrices
+* we rearrange all weights in a big matrix W, and all deltas at layer l in a vector called δl
+* with these the dum at each Node becomes a matrix multiplication
+* (W@l+1)Td@l+1=[[w11@l+1,...,wm1@l+1,...,wM1@l+1],...,[w1k@l+1,...,wmk@l+1,...,wMk@l+1],...,[w1K@l+1,...,wmK@l+1,...,wMK@l+1]]dot[δ1@l+1,...,δm@l+1,...,δM@l+1] = δ@l
+* the generalized simplified formula is (for the last layer) δL = del aL J (hadamard product) σ'(zL)
+* the formula in the inner layers is recursive δl=(Wl+1)Τdotδl+1(hadamard product)σ'(zl) the corrections to weights and biases are obtained by the deltas
+* Backpropagation Algorithm StepByStep
+	* Forwards propagation y^
+	* Error in last layer δL = del aL J (hadamard product) σ'(zL)
+	* Backward propagation (calculate error signals at each neuron in each layer) δl=(Wl+1)Τdotδl+1(hadamard product)σ'(zl)
+	* Calculate the derivative of the cost function with respect to the weights δJ/δwkl@l=δk@l x aj@l-1. result is a matrix same size as weight matrix
+	* Calculate the derivative of the cost function with respect to the biases δJ/δbj@l=δj@l (a column vector at each layer)
+	* we update each weight and each bias using gradient descent rule w -> w - δJ/δw , b -> b - δJ/δb
+
+### Lecture 68 - Numpy Arrays Code Along
+
+* numpy fast tutorial 
+* we import numpy, pandas, matplotlib
+* we create an array `a = np.array([1,2,3,4])`
+* we check it with `a` => array([1, 3, 2, 4])
+* we check its type `type(a)` => numpy.ndarray
+* we create 2D matrices of various size and check their shape
+```
+A = np.array([[3, 1, 2],
+              [2, 3, 4]])
+
+B = np.array([[0, 1],
+              [2, 3],
+              [4, 5]])
+
+C = np.array([[0, 1],
+              [2, 3],
+              [4, 5],
+              [0, 1],
+              [2, 3],
+              [4, 5]])
+
+print("A is a {} matrix".format(A.shape)) # A is a (2, 3) matrix
+print("B is a {} matrix".format(B.shape)) # B is a (3, 2) matrix
+print("C is a {} matrix".format(C.shape)) # C is a (6, 2) matrix
+```
+* we see various ways to acces elements in array or nested arrays
+```
+A[0] # array([3, 1, 2])
+C[2, 0] # 4
+B[:, 0] # array([0, 2, 4])
+```
+* we can do elementwise operations in numpy (aplly operator to each element)
+```
+3 * A # multiply each eleemnt with 3
+A - A # subtruct each eleemnt from its self (we expect all 0)
+```
+* we cannot do elementwise operations with arrays of different shape
+* what we can do is dot product (for arrays of different shape). it is matrix mutliplicationsso matrix multiplication rules apply (we can multily 2x3 dot 3x1 but not 2x3 dot 1x3)
+```
+A.dot(B) # or np.dot(A,B)
+# array([[10, 16],
+#       [22, 31]])
+```
+* A shape is (2,3) B is (3,2) so B.dot(A) is (3,3)
+
+### Lecture 69 - Learining Rate
+
+* when we update our products in gradient descent `w -> w - δcost/δw` we move by a quantity determined by the rate of change of the cost with respect to the weight w. 
+* this can be a problem in 2 ways. if the cost function is very flat we will move very slowly, if the cost function is very steep we might jump over the minimum
+* we intruduce a factor α that allows us to decide how big step to take in the direction of the gradient [w -> w - αδcost/δw] this is called learning rate. small learning rate means tiny steps. big learning rate means big steps
+* if learning rate is too large we might miss the solution (overshoot)
+
+### Lecture 70 - Learning Rate Code Along
+
+* we ll build a classifier to distinguish bank notes
+* we load the dataset `df = pd.read_csv('../data/banknotes.csv')`
+* check the feats `df.head()` we have 4 numeric feats and 1 target class (binary)
+* we display the df using seaborn pairplot to look at correlations `sns.pairplot(df, hue="class")`
+* the correlations look quite good in respect to class. (there are differences)
+* we check our class count in the df `df['class'].value_counts()`
+* we build our baseline model using TML (traditional machine learning) with the Random Forest Algo from sklearn
+* we do our imports
+```
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import scale
+```
+* we make our data for the algorithm scaling them to 0-1 using scale (does not fit the data, just scales)
+```
+X = scale(df.drop('class', axis=1).values)
+y = df['class'].values
+```
+* we do a default model and train it doing 3fold cross validation (default)
+```
+model = RandomForestClassifier()
+cross_val_score(model, X, y)
+```
+* scores are exceptioonal
+* we try logistic regression using keras 
+* we split our data
+```
+X_train, X_test, y_train, y_test = train_test_split(X, y,
+                                                    test_size=0.3,
+                                                    random_state=42)
+```
+* import our keras building blocks
+```
+import keras.backend as K
+from keras.models import Sequential
+from keras.layers import Dense, Activation
+from keras.optimizers import SGD
+```
+* we import backenf (tensorflow) as we want to clear the tensorflow session to run multiple models
+* build our model -> compile it -> fit it -> evaluieate it
+```
+K.clear_session()
+
+model = Sequential()
+model.add(Dense(1, input_shape=(4,), activation='sigmoid'))
+
+model.compile(loss='binary_crossentropy',
+              optimizer='sgd',
+              metrics=['accuracy'])
+
+history = model.fit(X_train, y_train)
+result = model.evaluate(X_test, y_test)
+```
+* we have saved the results of fitting to a variable as we want to plot it and compare models
+* we convert it to a dataframe `historydf = pd.DataFrame(history.history, index=history.epoch)`
+* inspect it `historydf.head()` it has 2 cols accuracy and loss over epochs
+* we plot it
+```
+historydf.plot(ylim=(0,1))
+plt.title("Test accuracy: {:3.1f} %".format(result[1]*100), fontsize=15)
+```
+* accuracy is good not perfect
+* we change the batchsize and learning rate
+* we make an empty list for dataframes as we will build different training histories to plot for different learning rates
+```
+dflist = []
+
+learning_rates = [0.01, 0.05, 0.1, 0.5]
+
+for lr in learning_rates:
+
+    K.clear_session()
+
+    model = Sequential()
+    model.add(Dense(1, input_shape=(4,), activation='sigmoid'))
+    model.compile(loss='binary_crossentropy',
+                  optimizer=SGD(lr=lr),
+                  metrics=['accuracy'])
+    h = model.fit(X_train, y_train, batch_size=16, verbose=0)
+    
+    dflist.append(pd.DataFrame(h.history, index=h.epoch))
+```
+* we concat dflist to a dataframe along columns
+```
+historydf = pd.concat(dflist, axis=1)
+```
+* we add multindex adding one more index level
+```
+etrics_reported = dflist[0].columns
+idx = pd.MultiIndex.from_product([learning_rates, metrics_reported],
+                                 names=['learning_rate', 'metric'])
+
+historydf.columns = idx
+```
+* we plot all columns using subplots
+```
+ax = plt.subplot(211)
+historydf.xs('loss', axis=1, level='metric').plot(ylim=(0,1), ax=ax)
+plt.title("Loss")
+
+ax = plt.subplot(212)
+historydf.xs('acc', axis=1, level='metric').plot(ylim=(0,1), ax=ax)
+plt.title("Accuracy")
+plt.xlabel("Epochs")
+
+plt.tight_layout()
+```
