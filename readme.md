@@ -1489,3 +1489,19 @@ plt.tight_layout()
 ## Section 6 - Convolutional Neural Networks
 
 ### Lecture 87 - Features from Pixels
+
+* images and how to use them as input to Neural Networks
+* How a computer see an image ? as a grid of points. each point has a value (a byte for grayscale, binary for BW, 3 bytes for RGB). the points on the grid are called pixels
+* greyscale usyaly use unsigned int of 1 byte 0-255
+* MNIST is a dataset of 70000 hand writen digits. 
+* the problem is how to map the image to a class (digit). the image is a 2d table
+* the simpest way is to use each pixel as a separate feature. the image is 28x28 so the feature space becomes of size 784. each feature is an integer of 0-255. this approach unrolls the image to a very large array of feats (vector)
+
+### Lecture 88 - MNIST Classification
+
+* we will see how to feed images to a Fully Connected NN with python
+* in this approach we have 764 inputs and 10 outputs (classes) passing through a fully connected DNN
+
+### Lecture 89 - MNIST Classification Code Along
+
+* 
