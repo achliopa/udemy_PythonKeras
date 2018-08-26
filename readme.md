@@ -1209,3 +1209,283 @@ plt.xlabel("Epochs")
 
 plt.tight_layout()
 ```
+
+### Lecture 71 - Gradient Descent
+
+* the gradient is calculated from the cost function andevaluated on the training data
+* w -> w - δJ/δw , J = J(y,y^(w,b,x)) x and y indicate a pair of training features and labels
+* we could feed the training data one point at the time to the cost function and for each pair calcualte the new weights. this is called Stochastic Gradient Descent (SGD)
+* once the model has sessn the training data once we say an epoch is completed and we start again
+* SGD is a very noisy estimation of the gradient as a single data point is used to estimate the gradient
+* We can imrove by averaging the gradient over the training data before updating the weights (Normal Gradient Descent)
+* In a Normal or Batch Gradient Descent we first calculate the gradient for all training data, then we averageit to update the weights. although more accurate its not an optimal method (we do one weight update per epoch)
+* An in-between solution is called MINI BATCH gradient descent. we still average the gradient over a small number of points (batch) taken from a sample of the training set (16,32,64,128,256)
+
+### Lecture 72 - Gradient Descent Code Along
+
+* we ll now see the effect of channging the batch size
+* we do thesame multy train session like in learnign rate code along. but now in each run we pass in a different batch size
+```
+dflist = []
+
+batch_sizes = [16, 32, 64, 128]
+
+for batch_size in batch_sizes:
+    K.clear_session()
+
+    model = Sequential()
+    model.add(Dense(1, input_shape=(4,), activation='sigmoid'))
+    model.compile(loss='binary_crossentropy',
+                  optimizer='sgd',
+                  metrics=['accuracy'])
+    h = model.fit(X_train, y_train, batch_size=batch_size, verbose=0)
+    
+    dflist.append(pd.DataFrame(h.history, index=h.epoch))
+```
+* concat lists into df and add a new level of index (multiindex)
+```
+historydf = pd.concat(dflist, axis=1)
+metrics_reported = dflist[0].columns
+idx = pd.MultiIndex.from_product([batch_sizes, metrics_reported],
+                                 names=['batch_size', 'metric'])
+historydf.columns = idx
+```
+* we plot in subplot per metric
+```
+ax = plt.subplot(211)
+historydf.xs('loss', axis=1, level='metric').plot(ylim=(0,1), ax=ax)
+plt.title("Loss")
+
+ax = plt.subplot(212)
+historydf.xs('acc', axis=1, level='metric').plot(ylim=(0,1), ax=ax)
+plt.title("Accuracy")
+plt.xlabel("Epochs")
+
+plt.tight_layout()
+```
+* best results we get from batch size = 16
+
+### Lecture 73 - EWMA (Exponential Weighted Moving Average)
+
+* One of the most imortant algorithms with application everywher (Finance, DSP, NNs})
+* say we have a sequence of ordered datapoints (values of a stock, sensor data) anything measured in a sequence
+* if the data is noisy we would like to smooth the data with a smoothing technique
+* a way to remove noise from a time series is to apply a moving average, we wait till we have enough samples and use their average as an estimation of the current val
+* to implement this method we need to keep many data in a buffer and update them anytime new data comes in
+* EWMA solved th eproblem with a recursive formula st = axt+(l-a)st-1. we need to keep track of only the last value of the average itself
+* the formula says that the moving average at time t is a mix between the value of the raw signal (xt) and the previous value of the moving average (st-1). 
+* the real mixing is controlled by a param s that takes values from 0 to 1 (0% to 100%). if a is small (10%) mpst of the contribution comes from previous values of the signal. if a is big most of the contribution comes from the raw signal
+
+### Lecture 74 - Optimizers
+
+* optimizers = cost minimization algorithms
+* so far we ve seen SGD
+* an imporvent on SGD is to add Momentum (we accumulate the gradient correction in a variable called velocity which serves as a smooth version of the gradient)
+* SGD with Nesterov momentum is like moementum as it accumulates gradients ina velocity variable but these variables are calculated using an interim update of the params. we perform an temprary update of the param using the previously calculated velocity, then we calculate gradients in this interim point, finally we update the params for real
+* SGD and SGD Momentum keep the learnign rate constant
+* Adaptive algotrithms adapt the learning rate to the size of the gradient
+* AdaGrad algorithm acccumulates the square of the gradient into a variable and computes the update with the inverse function of such square. this keeps the size of the parameter update stable despite of the gradient size
+* RMSProp is also adaptive but allows to choose the fraction of the square gradients to accumulate using an EWMA accumulation formula
+* The ADAM Algorithm is also adaptive and uses EWMA for both the gradient and square ofd the gradient
+* There is no best choice each of them performs best depending on the problem also changing hyper params
+
+### Lecture 75 - Optimizers Code Along
+
+* we ll see how to build different optimizers in keras
+* first we import them `from keras.optimizers import SGD, Adam, Adagrad, RMSprop`
+* we will run multiple training sessions like before storing all the training results (epoch wise) into an array which we will make a dataframe and plot to see the resutls. we test multiple optimizers with same learningrate but playing with hyper-params
+```
+dflist = []
+
+optimizers = ['SGD(lr=0.01)',
+              'SGD(lr=0.01, momentum=0.3)',
+              'SGD(lr=0.01, momentum=0.3, nesterov=True)',  
+              'Adam(lr=0.01)',
+              'Adagrad(lr=0.01)',
+              'RMSprop(lr=0.01)']
+
+for opt_name in optimizers:
+
+    K.clear_session()
+    
+    model = Sequential()
+    model.add(Dense(1, input_shape=(4,), activation='sigmoid'))
+    model.compile(loss='binary_crossentropy',
+                  optimizer=eval(opt_name),
+                  metrics=['accuracy'])
+    h = model.fit(X_train, y_train, batch_size=16, epochs=5, verbose=0)
+    
+    dflist.append(pd.DataFrame(h.history, index=h.epoch))
+```
+* we make the single datafram
+```
+historydf = pd.concat(dflist, axis=1)
+metrics_reported = dflist[0].columns
+idx = pd.MultiIndex.from_product([optimizers, metrics_reported],
+                                 names=['optimizers', 'metric'])
+historydf.columns = idx
+```
+* we plot
+```
+ax = plt.subplot(211)
+historydf.xs('loss', axis=1, level='metric').plot(ylim=(0,1), ax=ax)
+plt.title("Loss")
+
+ax = plt.subplot(212)
+historydf.xs('acc', axis=1, level='metric').plot(ylim=(0,1), ax=ax)
+plt.title("Accuracy")
+plt.xlabel("Epochs")
+
+plt.tight_layout()
+```
+* the best is Adam
+
+### Lecture 76 - Initialization Code along
+
+* we ll explore the effect of weight initialization with Keras
+* when we train our NN we need to assign init values to the weights in our model.
+* in our layer creator we can pass a kernel_initializer of our choise and a bias_initializer of our choice. otherwise keras assigns default values 'gloro_uniform and 'zeros' respectively
+* in this example we ran again a set of training sessions with various keras kernel(weight) initializers and plot the training results over epochs to compare
+```
+dflist = []
+
+initializers = ['zeros', 'uniform', 'normal',
+                'he_normal', 'lecun_uniform']
+
+for init in initializers:
+
+    K.clear_session()
+
+    model = Sequential()
+    model.add(Dense(1, input_shape=(4,),
+                    kernel_initializer=init,
+                    activation='sigmoid'))
+
+    model.compile(loss='binary_crossentropy',
+                  optimizer='rmsprop',
+                  metrics=['accuracy'])
+
+    h = model.fit(X_train, y_train, batch_size=16, epochs=5, verbose=0)
+    
+    dflist.append(pd.DataFrame(h.history, index=h.epoch))
+```
+* we build the df
+```
+historydf = pd.concat(dflist, axis=1)
+metrics_reported = dflist[0].columns
+idx = pd.MultiIndex.from_product([initializers, metrics_reported],
+                                 names=['initializers', 'metric'])
+
+historydf.columns = idx
+```
+* we plot
+```
+ax = plt.subplot(211)
+historydf.xs('loss', axis=1, level='metric').plot(ylim=(0,1), ax=ax)
+plt.title("Loss")
+
+ax = plt.subplot(212)
+historydf.xs('acc', axis=1, level='metric').plot(ylim=(0,1), ax=ax)
+plt.title("Accuracy")
+plt.xlabel("Epochs")
+
+plt.tight_layout()
+```
+* lecun_uniform performs best
+* everytime we rerun we get a different best... so when we have small datasets initialization has big impact on resutls
+
+### Lecture 77 - Inner Layers Visualization Code Along
+
+* we ll see how to visualize the activations of the inner layers
+* its a powerful tool to inspect the model and to dimanson the dataset
+* we still deal with banknote dataset (4 numarical feats , 1 categorical target)
+* we build a deep network (2 layers deep)
+* we train for 20epochs storing the train output 
+* we get the evaluation results
+```
+K.clear_session()
+
+model = Sequential()
+model.add(Dense(2, input_shape=(4,), activation='relu'))
+model.add(Dense(1, activation='sigmoid'))
+model.compile(loss='binary_crossentropy',
+              optimizer=RMSprop(lr=0.01),
+              metrics=['accuracy'])
+
+h = model.fit(X_train, y_train, batch_size=16, epochs=20,
+              verbose=1, validation_split=0.3)
+result = model.evaluate(X_test, y_test)
+```
+* we print the result, model.summary() and the model.layers
+* model layers are keras Dense objects `<keras.layers.core.Dense at 0x7ff6502acf60>,
+ <keras.layers.core.Dense at 0x7ff648764128>]`
+ * we can assign a models layer inputs and outputs to vars
+ ```
+ inp = model.layers[0].input
+out = model.layers[0].output
+ ```
+* they are tensorflow tesors `inp` => *<tf.Tensor 'dense_1_input:0' shape=(?, 4) dtype=float32>* `out` => *<tf.Tensor 'dense_1/Relu:0' shape=(?, 2) dtype=float32>*
+* we define a feautre function using Keras backend function method passing in the tensors
+```
+features_function = K.function([inp], [out])
+```
+* we checkj it `features_function` => *<keras.backend.tensorflow_backend.Function at 0x7ff641541400>*
+* we can now apply this function to any data, we apply it to X_test and it outputs a nested array  where we care for first element [0]. the shape of the data is `features_function([X_test])[0].shape` (412,2) so equal to the input datapoints as 2 equal to the inner layer nodes
+* we store it to a var and plot it with hue equal to the labels
+```
+features = features_function([X_test])[0]
+plt.scatter(features[:, 0], features[:, 1], c=y_test, cmap='coolwarm')
+```
+* what we see in the scattterplot is how our model internally learn to separate the labels
+* we reset and build a deep er model (3 layers)
+```
+K.clear_session()
+
+model = Sequential()
+model.add(Dense(3, input_shape=(4,), activation='relu'))
+model.add(Dense(2, activation='relu'))
+model.add(Dense(1, activation='sigmoid'))
+model.compile(loss='binary_crossentropy',
+              optimizer=RMSprop(lr=0.01),
+              metrics=['accuracy'])
+```
+* we take the input of 1st layer and output of second and we loop thtough the epochs 1-26 to see the evolution of separation of classes
+```
+inp = model.layers[0].input
+out = model.layers[1].output
+features_function = K.function([inp], [out])
+
+plt.figure(figsize=(15,10))
+
+for i in range(1, 26):
+    plt.subplot(5, 5, i)
+    h = model.fit(X_train, y_train, batch_size=16, epochs=1, verbose=0)
+    test_accuracy = model.evaluate(X_test, y_test)[1]
+    features = features_function([X_test])[0]
+    plt.scatter(features[:, 0], features[:, 1], c=y_test, cmap='coolwarm')
+    plt.xlim(-0.5, 3.5)
+    plt.ylim(-0.5, 4.0)
+    plt.title('Epoch: {}, Test Acc: {:3.1f} %'.format(i, test_accuracy * 100.0))
+
+plt.tight_layout()
+```
+
+### Lecture 82 - Exercise 3
+
+* KERAS Functional API allows more flexibility than sequential 
+
+### Lecture 84 - Exercise 4
+
+* keras offers the possibility to call a function at each epoch. These are Callbacks. they allow to add functionality
+
+### Lecture 86 - Tensorboard
+
+* we open a terminal in our env an type `tensorboard --logdir='./CourseRepo/course/tmp/udemy'` passing teh dir to the saved files from callbacks
+* it launches a web server
+* we open 0.0.0.0:6006 in browser
+* we have our training metrics in nice diagrams
+* a graph of our model
+
+## Section 6 - Convolutional Neural Networks
+
+### Lecture 87 - Features from Pixels
