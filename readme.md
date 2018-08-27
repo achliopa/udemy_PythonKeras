@@ -1504,4 +1504,144 @@ plt.tight_layout()
 
 ### Lecture 89 - MNIST Classification Code Along
 
+* keras offers MNIST in its collection of datasets. we import it `from keras.datasets import mnist`
+* mnist offers already split datasets `(X_train, y_train), (X_test, y_test) = mnist.load_data('/tmp/mnist.npz')`
+* we check the shape of data `X_train.shape` an is aarray of (60000, 28, 28). test has 10000 samples
+* we plot the 1st sample `plt.imshow(X_train[0], cmap='gray')` and see the image
+* to use the samples in our Network we need to unroll them with reshape so from 3d we go to 2d array
+```
+X_train = X_train.reshape(-1, 28*28)
+X_test = X_test.reshape(-1, 28*28)
+```
+* also from ints we convert the greyscale val to a 0-1 float
+```
+X_train = X_train.astype('float32')
+X_test = X_test.astype('float32')
+X_train /= 255.0
+X_test /= 255.0
+```
+* we ll do hot encoding of labels (0-9 labels) using keras 
+```
+from keras.utils.np_utils import to_categorical
+y_train_cat = to_categorical(y_train)
+y_test_cat = to_categorical(y_test)
+```
+* we ll build a fully connected model to classify the images
+* we build a 5 layer sequantial model of dense layers
+```
+from keras.models import Sequential
+from keras.layers import Dense
+import keras.backend as K
+
+K.clear_session()
+
+model = Sequential()
+model.add(Dense(512, input_dim=28*28, activation='relu'))
+model.add(Dense(256, activation='relu'))
+model.add(Dense(128, activation='relu'))
+model.add(Dense(32, activation='relu'))
+model.add(Dense(10, activation='softmax'))
+model.compile(loss='categorical_crossentropy',
+              optimizer='rmsprop',
+              metrics=['accuracy'])
+
+```
+* we train it and store the results from plotting `h = model.fit(X_train, y_train_cat, batch_size=128, epochs=10, verbose=1, validation_split=0.3)`
+* we plot the training jhistory
+```
+plt.plot(h.history['acc'])
+plt.plot(h.history['val_acc'])
+plt.legend(['Training', 'Validation'])
+plt.title('Accuracy')
+plt.xlabel('Epochs')
+```
+* in our training we reserved a percentage foro validation. our training accuracy is higher than our validation accuracy so we are overfitting
+* we evaluate on our test set and get the accuracy
+```
+test_accuracy = model.evaluate(X_test, y_test_cat)[1]
+test_accuracy
+```
+* it is 0.98
+
+### Lecture 90 - Beyond Pixels
+
+* we ll look into image feature extraction and local patterns for image recognition
+* our previous fully connected model performed well on training but troubled in generalizing
+* we llok into better approach (Feature extraction)
+* the most simple case of feature extraction is going from an image to a vector of pizels (WE DIT THAT)
+* Other methods are:
+	* Fourier coefficients
+	* Wavelets
+	* Histogram of Oriented Gradients (HOG)
+	* Speeded Up Robust Features (SURF)
+	* Local Binary Patterns (LBP)
+	* Color histograms
+* The banknote example we use in ML is an example as all feats used in Classification were generated with Feature Extraction on the Image of the BankNote
+* These methods require deep domain knowledge to solve a specific problem in image recognition
+* With NNs we seek to avoid these methods and learn the best feats from the image itself
+* What makes an image different from a vector is that the values of the pixels are correlated in 2d (horizontaly and verticaly). its the 2d pattern that carries the info
+* we would like to have a technique to capture these patterns automatically
+* we are more interested in a neighborhood of pixels that the position of pixels in the overall image (local patterns)
+* the technique is called convolution. to diegest it we need to learn about tensors
+
+### Lecture 91 - Images As Tensors
+
+* Scalars => numbers (no dimensions)
+* Vectors => lists of numbers (with dimensions) e.g [4,5,6,7,8,9] 6D vector. numbers in list are coordinates in space
+* Matrices => tables of numbers arranged in columns and rows [[0,1,0],[5,0,2]] => 2x3 matrix
+* the image is a 2D matrix each entry in matrix is the pixel value (also a list of vectors of same length, for the image a vector can be a row or collumn)
+* a vector is a list of scalars
+* we can construct an object (tensor) where an object of a certain order can be thought as a list of objects of previous order Order: 0=Scalar, 1=Vector, 2=matrix
+* Tensors can be expressed as nested lists of objects of previous order all with the same size
+* an order 3 tensor can be thought as a rubik cube a list of 3 tensors of order 2 (matrizes) of size 3x3
+* in a tensor we can find numbers by following any of the axes. in a 3d tensor each number is identified by HwD
+* The shape of a tensor tells us how many objects there are if we count on a particular axis e.g 3: noshape , [3,3,4,5]: (4,) [[1,2,3],[4,5,6]]: (2,3) [[[0,1],[2,3]],[[4,5],[6,7]]]: (2,2,2)
+* a color image is like 3 grayscale images each  corresponding to a color channel (R<G<B). each one contains the pixels of the image in that color. this is an order 3 tensor. there are 2 ordering conventions:
+	* If we think the image as a list of 3 single color images (C,H,W)
+	* if we think the image as an order 2 list of vector pixels where each pixels is a size 3 vector (R,G,B) then we represent it as (H,W,C) (channel last representation)
+
+### Lecture 92 - Tensor Math Code Along
+
+* we ll see how numpy deals with tensors 
+* we create 2 tensors of random ints 0-9 an order 4 of shape (2,3,4,5) and an order 2 size (2,3)
+```
+A = np.random.randint(10, size=(2, 3, 4, 5))
+B = np.random.randint(10, size=(2, 3))
+```
+* we print them out `B` => *array([[5, 4, 2],[6, 3, 2]])* they are nested numpy.ndarrays
+* we can access a single element by passing the indexes along each axis `A[0, 1, 0, 3]` => 8
+* we can create a random color image with numpy (3colors, 4x4) `img = np.random.randint(255, size=(4, 4, 3), dtype='uint8')` as h,w,c) channel last
+* we plot it out also its channels
+```
+plt.figure(figsize=(5, 5))
+plt.subplot(221)
+plt.imshow(img)
+plt.title("All Channels combined")
+
+plt.subplot(222)
+plt.imshow(img[:, : , 0], cmap='Reds')
+plt.title("Red channel")
+
+plt.subplot(223)
+plt.imshow(img[:, : , 1], cmap='Greens')
+plt.title("Green channel")
+
+plt.subplot(224)
+plt.imshow(img[:, : , 2], cmap='Blues')
+plt.title("Blue channel")
+```
+* tensors are numpy arrays so we can do elementwise operations (shape stays same)
+```
+2 * A
+A+A
+```
+* we can do dot multiplication with .tensordot() which is an extension of the dot product and it allows us to specify which axes we are contracting on  `np.tensordot(A, B, axes=([0, 1], [0, 1]))` shape is (4,5) and result is *array([[ 79,  86,  62,  85, 111],
+       [ 63, 132,  49, 136, 116],
+       [ 93, 116,  77,  86, 118],
+       [110, 103, 111,  84, 124]])*
+ * so essentialy we lose the axes we contract on (2,3)
+ * if we contract on one `np.tensordot(A, B, axes=([0], [0])).shape` we are left with (3,4,5,3) so 2 is lost from both and 3 from b is added in the end as dimansion
+
+### Lecture 93 - Convolution in 1D
+
 * 
