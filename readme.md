@@ -1644,4 +1644,36 @@ A+A
 
 ### Lecture 93 - Convolution in 1D
 
-* 
+* say we have 2 arrays g [-1,1] and f [0,0,0,0,0,1,1,1,1,1]
+* the convolution of the 2 is defined as follows:
+	* we take a subarray from f equal in size to the array g (smaller) starting from index 0. we multiply each eleemnt in g with the equivalene indexed element of subarray f and add the products (-1x0+1x0 = 0) we place the result in the first position of a new array [0, ....] this is step n=0
+	* we shift the window inf by 1 position to the right n=1 and repear the process. the result array is nmow [0,0,...]
+	* we continue till we reach the end of array f . the result is f * g =  [0,0,0,0,1,0,0,0,0]
+	* the mathematic formula oof 1d convolution is `(f*g)[n]=Σm=-MtoM(f[n-m]g[m]`
+* convolution takes max value when the f value matches value g. we will use convolution to detect patterns in images
+
+### Lecture 94 - Convolution in 1D Code Along
+
+* we create 2 arrays a and b
+```
+a = np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0], dtype='float32')
+b = np.array([-1, 1], dtype='float32')
+```
+* we use numpy built in method .convolve() to get the convolution between the 2 whitch is *array([ 0.,  0.,  0.,  0.,  0., -1.,  0.,  0.,  0.,  0.,  1.,  0.,  0., 0.,  0.,  0.], dtype=float32)*
+* we plot the original array and the convoluted
+```
+plt.subplot(211)
+plt.plot(a, 'o-')
+
+plt.subplot(212)
+plt.plot(c, 'o-')
+```
+
+### Lecture 95 - Convolution in 2D
+
+* say we have a 9by9 image of black background (pixel value=-1) and a white x (pixel value 1)
+* we will look for diagonal patterns like the ones rerpesented in a tegel of size 3by3 [[1,-1,-1],[-1,1,-1],[-1,-1,1]]
+* in the image there are 3 subsections that match exactly the patterns, and some other places with similar pattern
+* we calculate the convolution of the image with the tegel by multiplying the 3by3 tegel with a moving 3by3 subsection (step of 1)of the image and storing the results
+* when we have a perfect match the result of matrix multplication of the tegel and the subsection is [[1,1,1],[1,1,1],[1,1,1]] and the sum is 9 which we divide by the area of the patch 9/9=1. we store the result in a new image at the pixel location that represents the center pixel of the moving subsections current position
+* we repeat the process for the whole image and produce a heatmap for the result convoluted image values. we can see immediatly the perfect matches convolution is represented with a cross in a circle symbol
