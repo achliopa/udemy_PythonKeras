@@ -1885,3 +1885,102 @@ model.compile(loss='categorical_crossentropy',
 * CNNs are NOT useful in some cases:
 	* they are good at capturing spatialpatterns data
 	* not good if local patterns dont exist (eg in a DB table, order plays no role)
+
+### Section 7 - Cloud GPUs
+
+### Lecture 107 - Floyd GPU notebook setup
+
+* sign up floyd (free plan)
+* install or update floyd cli (in conda env) `Install or update Floyd `
+* login to cli `floyd login`
+* initialize a project `floyd init zerotodeeplearning`
+* make it public
+* go to notebook and addd `floyd run --gpu` in front of constly command (train cifar10)
+
+## Section 8 - Recurrent Neural Networks
+
+### Lecture 108 - Time Series
+
+* Time series examples
+	* stock market
+	* music
+	* video games
+	* IoT
+	* Energy monitoring
+	* Earthquakes
+	* weather
+	* Biosensors
+	* Website monitoring analytics
+* Time series: ordered series of datapoints
+* Time series can have as values, simple numbers or vectors
+* time series of vectors is represented with a time series per vector component
+* vector sequence time series: car speed, stero sound (2 channels)
+* ML for Time Series
+	* Prediction of future (regression, forecasting)
+	* Pattern Recognition & segmentation (classification,clustering, anomaly detection)
+	* Compression, noise reduction (preprocessing)
+* Forecasting:  given a sequence of values we want to predict the future values in the sequence (regression type problem but non linear ergression)
+* Detect Anomalies: given a sequence with regular behaviour identify when it deviates from the regularity (supervised learning approach if we know the anomalies we are looking for, or unsupervised learning if we dont know in that case we predict future values and we compare actual future values with the predicted ones)
+* Classification: find recurring patterns in time series and identify regions of recurring patterns (supervised, unsupervised)
+* Our data is ordered in time so caution is required
+	* we should avoid leaking future information in the future used by the model
+	* we cannot do a random split in train and test values, we need to split in time where training data are happening before the split and test data after the split
+	* sometimes a trnad is clearly visible in a time series (data related with human activity) we should remove these repetitions or consider the periodicity as a feat
+
+### Lecture 109 - Sequence Problems
+
+* other types of problems involving time sequences
+* simplest machine learnign problem involving a time sequence? an 1to1 problem
+	* 1 data input (data point or tensor) to the model
+	* model generates a prediction using the input
+* all problems we hve come acroos fall in this category: linear regression, classification, image classification with CNN are 1to1 problems. e.g in digits classification (MNIST) for each input image we had one label, when we classify purchases from users for each user we have a purchase label, when we distinguish banknotes. for each banknote we have one label
+* In time series we extend this formula for the model to use the past values of the input and the output
+* One to many problems starts like the 1to1 problem, we have 1 input to the model and it generates 1 output but the output of the model is fed back to the model as a new input and network genreates a new output and so on. 
+* a typical example of 1tomany problem is image captioning: as ingle image generates as output a text description of n length
+* Many to one problem is the reverse: we feed multiple input to the network, and at each step we feed back the network output into the network. we do this untill we reachthe end of the input sequence where we get the final output (text sentiment analysis falls in this category)
+* Many to many: in that case we have a sequence in input and a sequence in output (with feedback) this is the case of text translation
+* Synchronous Many to many: network outputs a value at each input (using the input and its previous state) e.g video frame classification
+* Recurrent neural Networks can deal with all these problems as the node interconnections form a directed cycle.
+* RNNs are able to retain state between iterations using their network output in the next step (like infinite response filters (IIR) in DSP) its like running a fixed program with fixed input and internal vars
+* RNNs essentialy describe programs (THey are TURNING complete)
+	* Vanilla NNs : optimiztion over functions
+	* RNNs optimization over programs
+
+### Lecture 110 - Vanilla RNN
+
+* Vanilla RNN = Simpest Form of RNN, make it Deep
+* RNNs maintain an internal state by using their own output as part of the input for th enext prediction
+* A simpe RNN can be viewed as a Fully Connected NN if we unroll it in the time axis
+	* output at time t ht=tanh(wht-1+uxt) we use 2 weights u and w (looks like EWMA) 
+	* w,u do not depend on time (same weights at all times)
+* we can build Deep RNNs by stacking Recurrent units (nodes) one on top of the other. we feed the input to first layer and feed the output of first layer to second ht@2 = tanh(w@2ht-1@2 + u@2ht@1) and so on
+* THe simple RNN works ony for short term memory (problematic on long term due to vanishing gradients)
+
+### Lecture 111 - LSTM and GRU
+
+ * LSTM (Long Short Term Memory Cell)
+ * GRU (Gated Recurrent Unit Cell)
+ * Both dont suffer from Vanishing Gradients problem
+ * The Vanilaa RNN where the output is fed back as input suffers from Vanishing Gradients Problem and cannot capture long term dependencies in sequences
+ * A brilliant way to solve thsi problem is LSTM
+ 	* this network is organized in cells
+ 	* cell maintains state
+ 	* gates modify information
+ 	* first gate is called "FORGET" gate `ft = σ(Wf[ht-1,xt]+bf` a sigmoid layer that takes the output@t-1 and current input x@t concatenates them in a single tensor applies a linear transformation (wx+b) followed by a sigmoid activation. because of sigmoid the output of this gate is 0-1. this output multiplies the cell state @t-1 and therefore is called the 'FORGET' gate
+ 	* the second gate is called the "INPUT" gate `it=σ(Wi[ht-1,xt]+bi)` it takes the previous output@t-1 and new input@t and passes them into another sigmoid layer like the forget gate. like before it returns a value 0-1
+ 	* the value of th einput gate is multiplied with the output of a *Candidate* layer C~t = tanh(Wc[ht-1,xt]+bC) which returns a candidate vector to be oadded to the  internal state
+ 	* The new cell state is calcualted Ct=ftCt-1+itC~t
+ 	* The 'Output' gate control how much of the internal state is passed in the output `ot = σ(Wo[ht-1,xt]+bo)` => `ht = ottanh(Ct)`
+ * A simpler version of LSTM is GRU
+ 	* similar to LSTM but simplified
+ 	* it doesnt pass along 2 separate variables (state, output) only the output
+ 	* has 2 gates instead of 3: 1st gate controls the mixing of the previous output with current input, the mix is passd to a tanh gate for the output 2nd gate controls mixing of previous output with the current output
+ * GRU formuals
+ 	* zt=δ(Wz[ht-1,xt])
+ 	* rt = s(Wr[ht-1,xt])
+ 	* h~t = tanh(W[rt * ht-1,xt])
+ 	* ht = (1-zt) * ht-1 + zt * h~t (EWMA)
+
+ ### Lecture 112 - Time Series Forecasting Code Along
+
+ * 
