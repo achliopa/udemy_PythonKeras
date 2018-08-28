@@ -1677,3 +1677,211 @@ plt.plot(c, 'o-')
 * we calculate the convolution of the image with the tegel by multiplying the 3by3 tegel with a moving 3by3 subsection (step of 1)of the image and storing the results
 * when we have a perfect match the result of matrix multplication of the tegel and the subsection is [[1,1,1],[1,1,1],[1,1,1]] and the sum is 9 which we divide by the area of the patch 9/9=1. we store the result in a new image at the pixel location that represents the center pixel of the moving subsections current position
 * we repeat the process for the whole image and produce a heatmap for the result convoluted image values. we can see immediatly the perfect matches convolution is represented with a cross in a circle symbol
+
+### Lecture 96 - Image Filters Code Along
+
+* we will perform convolutions on images using scipy library
+* we import our convolutiuon methods and a utils lib
+```
+from scipy.ndimage.filters import convolve
+from scipy.signal import convolve2d
+from scipy import misc
+```
+* we import an image from the miscellaneous lib `img = misc.ascent()`
+* we check its size `img.shape` its (512,512) so we expect it to be grayscale
+* we plot it `plt.imshow(img, cmap='gray')`
+* we ll do a convolution of this image with a kernel 3by3 expressed as numpy array
+```
+h_kernel = np.array([[ 1,  2,  1],
+                     [ 0,  0,  0],
+                     [-1, -2, -1]])
+```
+* we view the kernel `plt.imshow(h_kernel, cmap='gray')` we expect to get the highlights of horizontal lines
+* we do the convolution using convolve2d() and show the result
+```
+res = convolve2d(img, h_kernel)
+plt.imshow(res, cmap='gray')
+```
+* in a neural network the kernel is found by the network and is not predefined as its values are weights
+
+### Lecture 97 - Convolutional Layers
+
+* convolution layers, convolution of tensors, strides and padding
+* if we convolve the same image with different filters we get different convolved images, each of these convolved images represents the locations of the matches with the corresponding filter
+* we can take many filters and arrange them in a convolutional layer. when we feen an image to this layer the output is a stack of convolved images
+* since we know about tensors and we know that all the convolved images have same size (the filters have same size) we can arrange them in a tensor where the number of channels corresponds to the number of filters
+* filters also can be arranges in a tensor (a tensor of weights in the convolutional layer)
+* Our *Input Tensor* is an order 4 tensor (N,H,W,C)
+	* N: number of images (in batch)
+	* H: height of image 
+	* W: width of image
+	* C: Number of color channels
+* In MNIST assuming we feed all im,ages to the network in a single batch (CRAZY!) the input tensor is (60000,28.28,1)
+* In a similar way we can stack the filters in a Convolutional Layer Tensor which will also be an order 4 tensor (Hf,Wf,Ci,Co)
+	* Hf: Height of filter patch
+	* Wf: Width of filter patch
+	* Ci: Channels in Input (color channels)
+	* Co: Channels in output (#filters)
+* so if we use 2 3x3 filters for mnist set the COnv tensor size will be (3,3,1,2)
+* if we use these filters to convolve a single channel 9by9 image the size will be 
+	* INPUT: (-,9,9,1)
+	* CONV: (3,3,1,2)
+	* RESULT: (-,7,7,2) 7 is H and W of convolved image
+* As RESULT is an order 4 tensor we can feed it again to a filter layer
+	* INPUT: (-,7,7,2)
+	* CONV: (3,3,2,2) (4 fitlers 2 per input, same)
+	* RESULT: (-,5,52)
+* The convolved images are smaller after each convolution. this is controlled (apart from the size of filter) by the stride or pixel step we take in both directions. in all our previous examples stride was (1,1)
+* for our previous example a (2,2) stride would result in a 5,5 image and a step of (3,3) to a 3,3
+* we can stride on different length on each direction stride of (3,1) would result to a (3,7) image
+* if we dont want to loose the borders as essentialy even for a 3x3 filter we loose the outer rim in the result we need to add padding (with 0s) nd get as result a 9x9 image. this convolution preserves the size and is called Same
+
+### Lecture 98 - Convolutional Layers Code Along
+
+* we will use a convolution layer from Keras to perform a filtering operation on an image
+* we import the layer type `from keras.layers import Conv2D`
+* we use the same image from previous codealong
+* we build a order 4 input tensor reshaping the image array `img_tensor = img.reashape(1,512,512,1)`
+* we build a simple NN (sequential) with 1layer (Conv2D) and compil it (adam optimizer, mse metric)
+```
+model = Sequential()
+model.add(Conv2D(1,(3,3),strides=(2,1),input_shape=(512,512,1)))
+model.compile('adam','mse')
+```
+* the params for the conv2D
+	* 1 : node count
+	* (3,3) : filter size
+	* strides=(2,1) strides
+	* input_shape=(512,512,1) HxWxC
+* we dont train the model but it still can perform a predict= feed forward pass (single convolution)
+```
+img_pred_tensor = model.predict(img_tensor)
+```
+* the result has shape (1,255,510,1) stride of 3 halves the result, no padding so we lose the rim
+* we extract the image from tensor with indexing and plot it
+```
+img_pred = img_pred_tensor[0, :, :, 0]
+plt.imshow(img_pred, cmap='gray')
+```
+* image is compressed verically
+* we check the kernel used (shape and plot)
+```
+weights = model.get_weights()
+weights[0].shape # (3,3,1,1)
+plt.imshow(weights[0][:, :, 0, 0], cmap='gray')
+weights[0] = np.ones(weights[0].shape)
+```
+* we custom set an all ones filter and set it to model and use it to predict (do the convolution)
+```
+weights[0] = np.ones(weights[0].shape)
+model.set_weights(weights)
+img_pred_tensor = model.predict(img_tensor)
+```
+* we plot the rewsult
+```
+img_pred = img_pred_tensor[0, :, :, 0]
+plt.imshow(img_pred, cmap='gray')
+```
+* we get a blurred image
+* in the conv2D we can use padding='same' to add a size 1 padding of 0
+
+### Lecture 99 - Pooling Layers
+
+* a pooling operation reduces the size of the image by discarding some information
+* maxpooling only preserves (keeps) the maximum value in a patch and stores it in the new image by discarding the values of the other pixels
+* usually pooling patches do not overlap (the size of the image is reduced)
+* if we apply 2x2 max pooling to all the convoluyted images of the previous Convolution Layers Lecture their size is reduced from 7x7 to 4x4. the reduced images still preserve the approximate location of a perfect match
+* a pooling layer operates on the width and height axis of the data tensor (usually of the convolution layer output) (-,7,7,3) => (2,2) pooling layer => (-,4,4,3)
+* an AVG (Average) Pooling layer does the sam like maxpooling but instead of keeping the max pixel calculates and keeps the average
+* POOLING LAYER reduces size of image preserving the image information
+
+### Lecture 100 - Pooling Layers Code Along
+
+* we import the  pooling layers from keras `from keras.layers import MaxPool2D, AvgPool2D`
+* we build a simple model like before with one pooling layer (max pooling 5x5)
+* if we dont define strides it equalts to pool size
+```
+model = Sequential()
+model.add(MaxPool2D((5, 5), input_shape=(512, 512, 1)))
+model.compile('adam', 'mse')
+```
+* we dont train but use the model to get the result. we directly extract the image from tensor with indexing for plotting 
+```
+img_pred = model.predict(img_tensor)[0, :, :, 0]
+plt.imshow(img_pred, cmap='gray')
+```
+* granularity appers (max) info is preserved
+* we do the same with av gpooling `AvgPool2D` and compare the result image (smooth result)
+
+### Lecture 101 - Convolutional Neural Networks
+
+* we combine all what we learned to build a CNN
+* we start by stacking conv and pool layers together
+* we start from a simple image to smaller sized&more channel images
+* when we finish we can use the output of stacked layers as features of a fully connected classification network
+* feature extraction stack uses COnvolution-RELU-Convolution-RELU-Pooling-Convolution-RELU-Pooling 
+* the result is multiple 2x2 features. 
+* we can unroll the feats to a long vector and connect this vector to labels using a fully connected layer (or multiple fully connected layers)
+* Image->COnvolution-RELU-Convolution-RELU-Pooling-Convolution-RELU-Pooling-FullyConnected-FullyConnected-> Labels
+* the deeper we go in the network we get richer and more unique patterns matched so we get more robust classification
+
+### Lecture 102 - Convolutional Neural Networks Code Along
+
+* we will use the MNIST dataset input.
+* we reshape our X data (train,test) into tensors (-1 means leave as is)
+```
+X_train = X_train.reshape(-1, 28, 28, 1)
+X_test = X_test.reshape(-1, 28, 28, 1)
+X_train.shape # (60000,28,28,1)
+```
+* we import more layer types `from keras.layers import Flatten, Activation`
+* we clear the session `K.clear_session()`
+* set a sequential model `model = Sequential()`
+* we build the feature extraction part
+	* conv layer of 32 filters (3,3)
+	* maxpool of (2,2)
+	* relu activation layer
+```
+model.add(Conv2D(32, (3, 3), input_shape=(28, 28, 1)))
+model.add(MaxPool2D(pool_size=(2, 2)))
+model.add(Activation('relu'))
+```
+* we flatten the output tensor to a long array
+```
+model.add(Flatten())
+```
+* we add 2 dense layers for classification (multiclass so softmax in 2nd 10 nodes like the classes )
+```
+model.add(Dense(128, activation='relu'))
+model.add(Dense(10, activation='softmax'))
+```
+* we compile the model
+```
+model.compile(loss='categorical_crossentropy',
+              optimizer='rmsprop',
+              metrics=['accuracy'])
+```
+* we check the model config with `model.summary()`
+* the initial number of params for our classification is 692352
+* we fit the model `model.fit(X_train, y_train_cat, batch_size=128, epochs=2, verbose=1, validation_split=0.3)`
+* and evaluate it with test set `model.evaluate(X_test, y_test_cat)` we get 97.5% accuracy
+
+### Lecture 103 - Weights in CNNs
+
+* the filters in CNNs are not predefined. the va;lues in their tensors are the weights the network has to learn to solve the classification problem. so when we run a CNN training session we force it to learn the best patterns to solve the problem
+* We ll compare the parameter count in a fully connected layer and a convolutional layer
+	* Input data: Image 10x10 => 100 nums
+	* Fully Connected layer: 32 nodes => 100 weights each => 3200 weights
+	* Convolutional Layer: 32 filters or nodes 3x3 => 9 weights each => 288 weights
+* also as our arrays in a Conv lyaer are set in a 2D shape is more probalbe to catch local info in both directions
+* In CNN we trade params for computation
+
+### Lecture 104 - Beyond Images
+
+* other uses of CNNs  and Limits CNNs
+* CNNs are used on sound using the spectrogram (rerpesent sound in 2 axes, x: time steps, y: intensity in each frequency band)
+* we can feed spectrogram to CNN and treat it like an image
+* we can map a sentence of text on an image. (vertical axis: words in dictionary, vertical axis: position in sentence)
+* CNNs are NOT useful in some cases:
+	* they are good at capturing spatialpatterns data
+	* not good if local patterns dont exist (eg in a DB table, order plays no role)
