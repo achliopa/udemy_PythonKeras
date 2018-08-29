@@ -1983,4 +1983,157 @@ model.compile(loss='categorical_crossentropy',
 
  ### Lecture 112 - Time Series Forecasting Code Along
 
- * 
+ * we import the usual libs
+ ```
+ import pandas as pd
+import numpy as np
+%matplotlib inline
+import matplotlib.pyplot as plt
+ ```
+
+ * we import our data from csv, skip some data and show the df
+ ```
+ df = pd.read_csv('../data/cansim-0800020-eng-6674700030567901031.csv',
+                 skiprows=6, skipfooter=9,
+                 engine='python')
+df.head()
+ ```
+ * the data is from canada bureau of statistcs and has the monthly nationwide sales from 1991 to preasent (Jan-2017) it contains 3 columns (date,unadjusted sales, seasinly adjusted sales)
+ * we want ot have date as index we use a panda timeseries lib `from pandas.tseries.offsets import MonthEnd`
+ * we pass the column to .todatetime() method using MonthEnd() (which gives the month endo for each month) and set it as index
+ ```
+ df['Adjustments'] = pd.to_datetime(df['Adjustments']) + MonthEnd(1)
+df = df.set_index('Adjustments')
+df.head()
+ ```
+ * we plot the df `df.plot()` we can clearly see the 2008 financial crisis as an anomaly in the otherwise periodical series with an upward trend
+ * as we said we have to split our data on a specific time not randomly (past=train,future=test)
+ * we set a split date `split_date = pd.Timestamp('01-01-2011')`
+ * we use the unadjusted data for our dataset spliting on split date
+ ```
+train = df.loc[:split_date, ['Unadjusted']]
+test = df.loc[split_date:, ['Unadjusted']]
+ ```
+ * we plot them
+ ```
+ ax = train.plot()
+test.plot(ax=ax)
+plt.legend(['train', 'test'])
+ ```
+ * we will use minmaxscaler to scale our data for ML. when we use scalers its critical to fit only on our train data (we must know nothing for the future)
+ ```
+ from sklearn.preprocessing import MinMaxScaler
+
+sc = MinMaxScaler()
+
+train_sc = sc.fit_transform(train)
+test_sc = sc.transform(test)
+ ```
+ * from our dataset we produce our inputs and outputs.
+ * in timeseries inputs and outputs come from the same timeseries data but outputs start from the next timestamp (1step shift usually) as our model learn from previous timestamp and tries to match the next
+ ```
+ X_train = train_sc[:-1]
+y_train = train_sc[1:]
+
+X_test = test_sc[:-1]
+y_test = test_sc[1:]
+ ```
+ * we start our effort with a Vanilla NN (no recrsion)
+ * we do our imports
+ ```
+ from keras.models import Sequential
+from keras.layers import Dense
+import keras.backend as K
+from keras.callbacks import EarlyStopping
+ ```
+ * it is a regression problem (we try to predict a numeric val)
+ * we build our model (Fully COnnected NN)
+ ```
+ K.clear_session()
+
+model = Sequential()
+model.add(Dense(12, input_dim=1, activation='relu'))
+model.add(Dense(1))
+model.compile(loss='mean_squared_error', optimizer='adam')
+model.summary()
+ ```
+ * we instantiate our earlystopping callback (sve CPU )
+ ```
+ early_stop = EarlyStopping(monitor='loss', patience=1, verbose=1)
+ ```
+ * we train our model
+ ```
+ model.fit(X_train, y_train, epochs=200,
+          batch_size=2, verbose=1,
+          callbacks=[early_stop])
+ ```
+ * we get our predictions from the model `y_pred = model.predict(X_test)`
+ * we counterplot predictions and truth to evaluate 
+ ```
+ plt.plot(y_test)
+plt.plot(y_pred)
+```
+* our model is not good. it imitated the periodicity of the timeseries but it is time shifted by one step and has an offset
+
+### Lecture 113 - Time Series Forecasting with LSTM Code Along
+
+* we import LSTM layer from KEras `from keras.layers import LSTM`
+* recurrent layer requires an input with shape (batch_size, timesteps, input_dim) for our case (batch_size,1,1)
+* our tran input has shape `X_train.shape` (239,1)
+* we will transhorm it to X_train[:, None] with shape (239, 1, 1)
+```
+X_train_t = X_train[:, None]
+X_test_t = X_test[:, None]
+```
+* we build our model (1 layer, 6 cells) still a regression problem
+```
+K.clear_session()
+model = Sequential()
+
+model.add(LSTM(6, input_shape=(1, 1)))
+
+model.add(Dense(1))
+
+model.compile(loss='mean_squared_error', optimizer='adam')
+```
+* we train our model  `model.fit(X_train_t, y_train,epochs=100, batch_size=1, verbose=1,callbacks=[early_stop])`
+* we evaluate and compare results like before
+```
+y_pred = model.predict(X_test_t)
+plt.plot(y_test)
+plt.plot(y_pred)
+```
+* it recalls fetter than the ANN but is not so much better
+
+### Lecture 114 - Rolling Windows
+
+* a technique to extract feats from a time series.
+* in all the proplems so far we asked from NNs to predict the future using their internal state and the current value of the sequence
+* what id instead of feeding just one step we fed a short history of values
+* this is called the rolling window approach. we take a fixed size window and use all the data contained in the window to predict values after the window. then we slide the windo by a stride (usually 1/2 window length)and repeat
+* The rolling windows approiach is used in many successful apps (it was used much before NNs)
+* It can be used with ML and traditional feats
+* Features at window:
+	* Past Raw Values
+	* Stats: Mean<Stdev,Moments,Correlation ...
+	* Frequency: FFT< Wavelets, Spectral Band Power, Entropy...
+	* Autoregressive models
+	* Other: Hjorth,Mann-Kendall...
+* In deep learning on windows we have 2 options on how to use the window:
+	* feed the window in a RNN in sequence 1 point at a time asking for a prediction at the end (Many to 1 sequence problem)
+	* feed the window all at once using each point as a different feature, if we do this we are not bount to use RNNs. we can use CNNs or FNNs because we have mapped the regional sequence problem to an 1to1 problem where input space is a vector (points in window)
+
+### Lecture 115 - Rolling Windows Code Along
+
+* we will use an RNN that uses a window and also a fnn that uses a window
+* we build a scaled time series (from our scaled data which is a numpy array build a dataframe)
+```
+train_sc_df = pd.DataFrame(train_sc, columns=['Scaled'], index=train.index)
+test_sc_df = pd.DataFrame(test_sc, columns=['Scaled'], index=test.index)
+```
+* in this scaled dfs we add time shifted columns from 1 to 13 steps shift using the pandas .shift() method
+```
+for s in range(1, 13):
+    train_sc_df['shift_{}'.format(s)] = train_sc_df['Scaled'].shift(s)
+    test_sc_df['shift_{}'.format(s)] = test_sc_df['Scaled'].shift(s)
+```
