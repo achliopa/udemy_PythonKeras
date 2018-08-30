@@ -2137,3 +2137,265 @@ for s in range(1, 13):
     train_sc_df['shift_{}'.format(s)] = train_sc_df['Scaled'].shift(s)
     test_sc_df['shift_{}'.format(s)] = test_sc_df['Scaled'].shift(s)
 ```
+
+### Lecture 119 - Learning Curves Code Along
+
+* we are goind to plot learning curves for a dataset of digits (smaller MNIST dataset)
+* we import usual libs
+* we import the dataset from sklearn `from sklearn.datasets import load_digits`
+* we load the dataset `digits = load_digits()`
+* we extract feats and targets with builtin libs `X, y = digits.data, digits.target`
+* we check first sample in set `X[0]` is a flattened numpy array of ints of size 64 (greyscale)
+* our set of image has `X.shape` (1797,64)` 1797 imsages of 8x8 flattened
+* we reshape and plot the first 8
+```
+for i in range(8):
+    plt.subplot(1,8,i+1)
+    plt.imshow(X.reshape(-1, 8, 8)[i], cmap='gray')
+```
+* we import learning curve from sklearn ``
+* we import from keras libs
+```
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.utils import to_categorical
+import keras.backend as K
+from keras.callbacks import EarlyStopping
+```
+* we clear the session `K.clear_session()`
+* we build the first model (sequencial, dense layers, 16 neurosns the 1st, 10 the second, softmax for categorical classification input shape (64,))
+```
+model = Sequential()
+model.add(Dense(16, input_shape=(64,), activation='relu'))
+model.add(Dense(10, activation='softmax'))
+model.compile('adam', 'categorical_crossentropy', metrics=['accuracy'])
+```
+* as we will run the same model again and again to extract emntrics for our curve we want to make sure initialization is the same, so we store the initial weights for reuse `initial_weights = model.get_weights()`
+* we make our target set hot encoded `y_cat = to_categorical(y, 10)`
+* we split th date to train/test
+```
+X_train, X_test, y_train, y_test = train_test_split(X, y_cat,
+                                                    test_size=0.3)
+```
+* we build an array of train sizes to use in our learning curve runs (4 train sizes)
+```
+train_sizes = (len(X_train) * np.linspace(0.1, 0.999, 4)).astype(int)
+```
+* we initialize two arrays to store the scores
+```
+train_scores = []
+test_scores = []
+```
+* we do our runs in afor loop and store the results
+* each time we do a new test split, set initali wights train,evaluate,storre scores
+```
+for train_size in train_sizes:
+    X_train_frac, _, y_train_frac, _ = \
+    train_test_split(X_train, y_train, train_size=train_size)
+    
+    # at each iteration reset the weights of the model
+    # to the initial random weights
+    model.set_weights(initial_weights)
+    
+    h = model.fit(X_train_frac, y_train_frac,
+                  verbose=0,
+                  epochs=300,
+                  callbacks=[EarlyStopping(monitor='loss', patience=1)])
+
+    r = model.evaluate(X_train_frac, y_train_frac, verbose=0)
+    train_scores.append(r[-1])
+    
+    e = model.evaluate(X_test, y_test, verbose=0)
+    test_scores.append(e[-1])
+    
+    print("Done size: ", train_size)
+```
+* we plot the resutls
+```
+plt.plot(train_sizes, train_scores, 'o-', label="Training score")
+plt.plot(train_sizes, test_scores, 'o-', label="Test score")
+plt.legend(loc="best")
+```
+* our model needs improvement
+
+### Lecture 120 - Batch Normalization
+
+* technique that reduces the chances of overfitting by rescaling the feats between one layer and the next
+* first we start with the values of the features coming from a particular batch of training data (activations values after a layer or even raw feats at input)
+	* Input: Valyues of x over a mini-batch: B={x1..m}; parameters to be learned γ,β
+	* Output: {yi = BNγβ(xi)} 
+	* Step 1: Calculate the mini-batch mean μB <- 1/mΣi=1..m(xi)
+	* Step 2: Calculate the mini-batch variance σ^2Β <- 1/mΣi=1..m(xi-μB)^2
+	* Step 3: Normalize ^xi <- (xi-μΒ)/sqrt(σ^2Β+ε) we use ε is a small regularizer to avoid division by 0
+	* Step 4: We scale and shift the normalized features with γ and β yi <- (γ * ^xi)+β = ΒΝγ,β(xi)
+* Batch normalization is very modern technique and improves results in very large networks
+* It also helps train and converge faster
+
+### Lecture 121 - Batch Normalization Code Along
+
+* we import BatchNormalization class from keras layers `from keras.layers import BatchNormalization`
+* we implement a function that repreats the training
+	* we pass in train and test data
+	* the num of neurons in our layers
+	* optimizer,activation,epochs
+	* a flag to do or not batch normalization
+	* we set a an array for training history data
+	* we do a for loop that for the reppeats we passed creates the model trains it and appends the history data (accuracy and validation accuracy)
+	* we add or not batch normalization layers between normal layers according to the flag
+	* after for loop ends we calculate the std dev and mean of 2 metrics and return them
+```
+def repeated_training(X_train,
+                      y_train,
+                      X_test,
+                      y_test,
+                      units=512,
+                      activation='sigmoid',
+                      optimizer='sgd',
+                      do_bn=False,
+                      epochs=10,
+                      repeats=3):
+    histories = []
+    
+    for repeat in range(repeats):
+        K.clear_session()
+
+        model = Sequential()
+        
+        # first fully connected layer
+        model.add(Dense(units,
+                        input_shape=X_train.shape[1:],
+                        kernel_initializer='normal',
+                        activation=activation))
+        if do_bn:
+            model.add(BatchNormalization())
+
+        # second fully connected layer
+        model.add(Dense(units,
+                        kernel_initializer='normal',
+                        activation=activation))
+        if do_bn:
+            model.add(BatchNormalization())
+
+        # third fully connected layer
+        model.add(Dense(units,
+                        kernel_initializer='normal',
+                        activation=activation))
+        if do_bn:
+            model.add(BatchNormalization())
+
+        # output layer
+        model.add(Dense(10, activation='softmax'))
+        
+        model.compile(optimizer,
+                      'categorical_crossentropy',
+                      metrics=['accuracy'])
+
+        h = model.fit(X_train, y_train,
+                      validation_data=(X_test, y_test),
+                      epochs=epochs,
+                      verbose=0)
+        histories.append([h.history['acc'], h.history['val_acc']])
+        print(repeat, end=' ')
+
+    histories = np.array(histories)
+    
+    # calculate mean and standard deviation across repeats:
+    mean_acc = histories.mean(axis=0)
+    std_acc = histories.std(axis=0)
+    print()
+    
+    return mean_acc[0], std_acc[0], mean_acc[1], std_acc[1]
+```
+* we run the function with/withouf batch normalization
+```
+mean_acc, std_acc, mean_acc_val, std_acc_val = \
+    repeated_training(X_train, y_train, X_test, y_test, do_bn=False)
+```
+* we build a helper function that plots the mean and the a shaded area around mean equal to std deviation in both sides
+```
+def plot_mean_std(m, s):
+    plt.plot(m)
+    plt.fill_between(range(len(m)), m-s, m+s, alpha=0.1)
+```
+* we plot
+```
+plot_mean_std(mean_acc, std_acc)
+plot_mean_std(mean_acc_val, std_acc_val)
+plot_mean_std(mean_acc_bn, std_acc_bn)
+plot_mean_std(mean_acc_val_bn, std_acc_val_bn)
+plt.ylim(0, 1.01)
+plt.title("Batch Normalization Accuracy")
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend(['Train', 'Test', 'Train with Batch Normalization', 'Test with Batch Normalization'], loc='best')
+```
+* batch normalization does MARVELS (fast convergence , good results)
+
+### Lecture 122 - Dropout
+
+* is a counterintuitive recent technique that came fro ML to NNs.
+* if a network is large it has a lot of params so the risk of overfitting is high
+* we can reduce the risk by randomly killing nodes in each training iteration (kill others in next) 
+* this can be formally expresed by introducing a probability p for the node of being present and use that probability at training time. at test time the node will always be present
+* this random disruption forces the network to learn more representative features by building redundancy in its connections
+* each node cannot rely on any other node to correct the errors it makes (they can randomly dissapear)
+* the node must learn to do its job properly
+* dropout improves network performance in many datasets
+* dropout has one hyperparameter: the probaiblity p of retaining a node (fraction of node active in training)
+* 0.3 to 0.7 is the range of probability to stable improving results
+
+### Lecture 123 - Dropout and Regularization Code Along
+
+* we ll see how to add dropout and weight regularization in a NN
+* Dropout in keras is a separate layer. we import it `from keras.layers import Dropout`
+* we build our model using dropout layers
+	* in first dropout layer we drop 20% of the input
+	* after first fully connected layer we add a second dropout layer of 40% probability to drop
+	* we add regularization to a layer weights by adding the param `kernel_regularizer='l2'`
+```
+model = Sequential()
+model.add(Dropout(0.2, input_shape=X_train.shape[1:]))
+# first fully connected layer
+model.add(Dense(512, kernel_initializer='normal',
+                kernel_regularizer='l2', activation='sigmoid'))
+model.add(Dropout(0.4))
+model.add(Dense(10, activation='softmax'))
+
+model.compile('sgd',
+              'categorical_crossentropy',
+              metrics=['accuracy'])
+```
+
+### Lecture 124 - Data Augmentation
+
+* this technique is useful to generate more data when we cannot collect more data
+* it might be very expensive to generate more learning data w/ labels
+* say our dataset are images and our task is to tell if they show a cat
+* we can generate more samples by
+	* shifting the image
+	* flipping the image
+	* rotate image
+	* change aspect ratio
+	* zoom out/in
+	* shear
+	* change colorscale
+	* shear (tilt)
+	* add random noise
+	* add small occlusions and deletions
+	* any transofrmation when we see a cat (the machine should learn to do the same)
+
+### Lecture 125 - Continuous Learning
+
+* data augmentation is the first step
+* we can use a seed dataset with labels and loop through it adding all the transformations to augment the data set
+* we continuopus feed small variations of the seed dataset to the model generating modifyied data on the fly
+* we can do this for images but also for sound
+	* change pitch
+	* change speed
+	* add background noise
+	* add artifacts (noises,traffic)
+	* distortion,echo
+* text is harder to augment (use synonyms from thesaurus)
+* when generating data on the fly concept of epoch is not well defined
+	* we define batch size
+	* we monitor progress and stop when results are good enough
