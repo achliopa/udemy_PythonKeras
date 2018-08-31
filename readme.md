@@ -2138,6 +2138,54 @@ for s in range(1, 13):
     test_sc_df['shift_{}'.format(s)] = test_sc_df['Scaled'].shift(s)
 ```
 
+### Lecture 116 - Exercise 1
+
+* we wanth to reshape our input data (monthly sales) not as (228, 1, 12) but as (228, 12, 1) sequence of 12 single num values
+```
+X_train_t = X_train.reshape(X_train.shape[0],12,1)
+X_test_t = X_test.reshape(X_test.shape[0],12,1)
+```
+* we do the imports
+```
+from keras.models import Sequential
+from keras.layers import LSTM, Dense
+import keras.backend as K
+from keras.callbacks import EarlyStopping
+```
+* we build our model
+```
+K.clear_session()
+model = Sequential()
+model.add(LSTM(6, input_shape=(12, 1)))
+model.add(Dense(1))
+model.compile(loss='mean_squared_error', optimizer='adam')
+```
+* our model has less params
+* we train predict and plot
+```
+model.fit(X_train_t, y_train, epochs=100,
+          batch_size=1, verbose=1, callbacks=[early_stop])
+y_pred = model.predict(X_test_t)
+plt.plot(y_test)
+plt.plot(y_pred)
+```
+* error is high (we remove early stoping)
+* we remove early stoip increase epochs to 600 (results is very good)
+
+## Section 9 - Imporving Performance 
+
+### Lecture 118 - Learning Curves
+
+* a trained model will have certain performance over the test set
+* if we want to imporve performance we have a dilemma: get more data or try a better model?
+* say we have 1500 datapoints (pictures) 50% have label=cat and 50%=dog, we train our model on 1200 points and test on 300 pictures (20% split) and get 95% accuracy in our classification
+* to answer our dilemma (data or model) we do the following:
+	* we isolate the 300 test pictures and train on a fraction of the remaining 1200 pictures (e.g 100 picts)
+	* we evaluate on train and test data and mark the scores on a chart where x is the num of datapoints in our train set (we expect overfitting)
+	* we repeat for say 500 training points (test score should improve)
+	* we increase till we use all our available trainign data.
+	* if we saw in our graph that test score has already stoped increasing while increasing our train set is probably a model problem. if it is constantly improving we need more data
+
 ### Lecture 119 - Learning Curves Code Along
 
 * we are goind to plot learning curves for a dataset of digits (smaller MNIST dataset)
@@ -2146,14 +2194,14 @@ for s in range(1, 13):
 * we load the dataset `digits = load_digits()`
 * we extract feats and targets with builtin libs `X, y = digits.data, digits.target`
 * we check first sample in set `X[0]` is a flattened numpy array of ints of size 64 (greyscale)
-* our set of image has `X.shape` (1797,64)` 1797 imsages of 8x8 flattened
+* our set of image has `X.shape` (1797,64) 1797 imsages of 8x8 flattened
 * we reshape and plot the first 8
 ```
 for i in range(8):
     plt.subplot(1,8,i+1)
     plt.imshow(X.reshape(-1, 8, 8)[i], cmap='gray')
 ```
-* we import learning curve from sklearn ``
+* we import learning curve from sklearn 
 * we import from keras libs
 ```
 from keras.models import Sequential
@@ -2399,3 +2447,186 @@ model.compile('sgd',
 * when generating data on the fly concept of epoch is not well defined
 	* we define batch size
 	* we monitor progress and stop when results are good enough
+
+### Lecture 126 - Image Generator Code Along
+
+* we ll talk on continuous training
+* with this process we flow in data continuously and we modify it. 
+* our training set becomes a generator that feeds data continuously to the model
+* for images we can do that in Keras with a class called ImageDataGenerator 
+* we import it `from keras.preprocessing.image import ImageDataGenerator`
+* we instantiate it passing in the params for the various transformations to be applied
+```
+generator = ImageDataGenerator(rescale = 1./255, # pixel range 0-1
+                               width_shift_range=0.1,
+                               height_shift_range=0.1,
+                               rotation_range = 20, # in deg
+                               shear_range = 0.3,
+                               zoom_range = 0.3,
+                               horizontal_flip = True)
+```
+* generator exposes many methods: flow uses in memory seeds, flow_from_directory takes images from dir
+* we generate the train set using the class method .flow_from_directory() pasisng in the location of seed data, image size, batch size
+```
+train = generator.flow_from_directory('../data/generator',
+                                      target_size = (128, 128),
+                                      batch_size = 32,
+                                      class_mode = 'binary')
+```
+* he finds one image in the claas 0 folder
+* we ask for 16 genrated images from generator to see the power of data generation
+```
+plt.figure(figsize=(12, 12))
+for i in range(16):
+    img, label = train.next()
+    plt.subplot(4, 4, i+1)
+    plt.imshow(img[0])
+```
+
+### Lecture 127 - Hyperparameter search
+
+* we ll see what are hypermparams and how to optimize them
+* Hyperparams categories
+	* Network Architecture: # Layers, # Nodes (neurons), Layer types, Activation Function
+	* Regularization: Batch Norm(Y/N) Dropout(Y/N, probability) WeightRegularization (Y/N), Weight Initialization (Gaussian,Uniform,Scaled...)
+	* Data Augmentation: Transformations
+	* Optimizers: Optimizer Type (Adam,SGD,Adadelta...), Learning Rate, Batch size, others..
+* Experiment to optimize
+	* Set params
+	* train for fixed num of epochs
+	* check train/test scores
+* Usually we do many experiments in paralleel: 
+	* master process coordinates the choice of params
+	* worker parallel processes conduct the experiments and report back the results
+	* master uses various methods to choose params (random,grid search, bayesiasn optimization)
+* Grid params search:
+	* we assign ranges to each param 
+	* sample regularly within the assigned range (linspace)
+* Randdom Vs Grid
+	* we set the range and sample randomly
+* Bayesian way:
+	* intelligent search of hyperparam combination
+	* sequnetial design strategy for global optimization of black-box functions
+	* doesn't require derivatives (unlike gradient descent)
+* Bayesian Iptimization strategy:
+	* objective function unknown
+	* prior distribution
+	* get score
+	* update distribution
+
+### Lecture 128 - Embeddings 
+
+* extract features from text
+* use embedding layers
+* how to go from sequence of words to numerical feats?
+	* Easies= way: build a dictionary of words and use index => feed it to a RNN. dictionaries count 10sK words, no relations between words
+	* We can binarize the index to a huge vector sized equal to dictionary (like hot-encodeding). the input vector will be sparce and huge size
+	* Use an embedding layer: take the sparce generated vector from dictionary and condence it to a much smaller dence space (like PCA)
+* Embedding maps each word to a vector of few coordinates
+* This method encapsulates semantic meaning in a denser space
+* We train embedding layer at same time as classification the embedding layer will try to map words with close meaning closeby in space (semantic clouds of vectors)
+* using the semantic cloud we can perform mathematical operations with words: King - Man + Woman = Queen
+
+### Lecture 129 - Embeddings Code Along
+
+* we ll see how to add an embedding layer to a model
+* import the layer `from keras.layers import Embedding`
+* build a simple network with one embedding layer (input 100=dictionary size, output =2 dimensions)
+* the node count is 200
+```
+model = Sequential()
+model.add(Embedding(input_dim=100, output_dim=2))
+model.compile(loss='binary_crossentropy',
+              optimizer='adam',
+              metrics=['accuracy'])
+```
+* it interprets vector size as num in our input 81 (is 81 index in inpute vector space)
+* we pass in a 2d array od size (3,4)
+* each number will be converted to a 2d array ( sem cloud position in 2d)
+```
+emb = model.predict(np.array([[81,  1, 96, 79],
+                              [17, 47, 69, 50],
+                              [49,  3, 12, 88]]))
+```
+* the reult is (3,4,2) so each number now has 2 coordinates
+
+### Lecture 130 - Movies Reviews Sentiment Analyis Code Along
+
+* we ll apply embedding layers to a real world problem
+* we ll predict the  sentiment of movie reviews
+* we use the  imdb preset dataset from keras. we import it `from keras.datasets import imdb`
+* load train,test feats/labels from a temp location passing parameters: num_words=None means load all words, maxlength=None means no maxlength. we can pass most common wordsm out of index char is 2, all lists start with index 1, dictionary is shifted by 3 
+```
+(X_train, y_train), (X_test, y_test) = imdb.load_data('/tmp/imdb.npz',
+                                                      num_words=None,
+                                                      skip_top=0,
+                                                      maxlen=None,
+                                                      start_char=1,
+                                                      oov_char=2,
+                                                      index_from=3)
+```
+* we will train a classifier that takes the review as input and predicts if it was a positive or negative review
+* our `Xtrain` have shape (25000,) so 25k reviews in training set
+* we check the first `X[0]` it is a long list of word indexes (they have already been encoded with a dictionary)
+* using the .get_word_index method `idx = imdb.get_word_index()` we can get the dictionary used for indexing {word:num}
+* the max index value (dictionary size) is  `max(idx.values())` 88584 words
+* we set the rev_idx method to get the words from index `rev_idx = {v+3:k for k,v in idx.items()}` {num:word}
+* we add to our rev_index the special characters
+```
+rev_idx[0] = 'padding_char'
+rev_idx[1] = 'start_char'
+rev_idx[2] = 'oov_char'
+rev_idx[3] = 'unk_char'
+```
+* we get the actual revious from an encoded train sample 
+```
+example_review = ' '.join([rev_idx[word] for word in X_train[0]])
+example_review
+```
+* we check the length of reviews `len(X_train[1])` they have different lengths
+* we import keras libs (we need to pad reviews to equal length)
+```
+from keras.preprocessing.sequence import pad_sequences
+from keras.layers import LSTM
+```
+* we set maxlength to 100 words and pad all sample data to maxlength
+```
+maxlen = 100
+X_train_pad = pad_sequences(X_train, maxlen=maxlen)
+X_test_pad = pad_sequences(X_test, maxlen=maxlen)
+```
+* now our trainset has shape `X_train_pad.shape` is (25000,100)
+* padding trancate the beginning of reviews exceeding maxlength
+* we check for maximum number of features which is 88587 9train and test
+```
+max_features = max([max(x) for x in X_train_pad] + 
+                   [max(x) for x in X_test_pad]) + 1
+max_features
+```
+* we build our model
+	* we go gfrom max features to 128 dim. vector space in an embeddigs layer
+	* we do LSTM will take the sequence of words and encode it (adding dropout and recurrent dropout) to return a binary output which we pass from sigmoid
+```
+model = Sequential()
+model.add(Embedding(max_features, 128))
+model.add(LSTM(64, dropout=0.2, recurrent_dropout=0.2))
+model.add(Dense(1, activation='sigmoid'))
+
+model.compile(loss='binary_crossentropy',
+              optimizer='adam',
+              metrics=['accuracy'])
+```
+* we train the model
+```
+model.fit(X_train_pad, y_train,
+          batch_size=32,
+          epochs=2,
+          validation_split=0.3)
+```
+* we check accuracy on test set (evaluate)
+```
+score, acc = model.evaluate(X_test_pad, y_test)
+print('Test score:', score)
+print('Test accuracy:', acc)
+```
+* its 0.83 which is ok for 2 epochs
